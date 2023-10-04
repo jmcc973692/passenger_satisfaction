@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environment
+venv/
+
+# Exclude .vscode directory
+.vscode/
+
+# Exclude submission directory
+submission/

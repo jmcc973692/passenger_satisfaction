@@ -10,5 +10,7 @@ venv/
 # Exclude .vscode directory
 .vscode/
 
-# Exclude submission directory
+# Exclude output directories
 submission/
+output/
+

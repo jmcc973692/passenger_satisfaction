@@ -1,20 +1,11 @@
-from sklearn.ensemble import GradientBoostingClassifier
+import xgboost as xgb
 
 
-def train_model(train_x, train_y):
-    # Initialize the Gradient Boosting Classifier
-    model = GradientBoostingClassifier(n_estimators=100, random_state=42)
-
-    # Fit the model to the training data
+def xgboost_train_model(train_x, train_y):
+    model = xgb.XGBClassifier(objective="binary:logistic", n_estimators=100, max_depth=5)
     model.fit(train_x, train_y)
-
     return model
 
 
-def evaluate_model(model, test_x, test_y):
-    # Make predictions on the test data
-    y_pred = model.predict(test_x)
-
-    # Evaluate model accuracy
-    accuracy = (y_pred == test_y).mean()
-    return accuracy
+def evaluate_model(model, val_x, val_y):
+    return model.score(val_x, val_y)

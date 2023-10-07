@@ -9,7 +9,7 @@ from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score
 
-from src.data_handling import drop_low_importance_features, prepare_data
+from src.data_handling import keep_best_features_only, prepare_data
 from src.feature_engineering import perform_feature_engineering
 from src.hyperparameter_tuning import tune_lgbm_parameters, tune_rf_parameters, tune_xgb_parameters
 from src.submission import load_sample_submission, save_submission, update_submission_structure
@@ -45,8 +45,32 @@ def main(train_path, test_path, sample_submission_path, submission_dir, algorith
     train_df = perform_feature_engineering(train_df)
     test_df = perform_feature_engineering(test_df)
 
-    train_df = drop_low_importance_features(train_df)
-    test_df = drop_low_importance_features(test_df)
+    best_features = [
+        "Age^2",
+        "Age^3",
+        "Arrival_Delay_in_Minutes",
+        "Arrival_Delay_in_Minutes^2",
+        "Class_Economy",
+        "Class_Economy Plus",
+        "Cleanliness",
+        "Convenience_of_Departure/Arrival_Time_",
+        "Departure_Delay_in_Minutes^2",
+        "Departure_Delay_in_Minutes^3",
+        "Departure_Delay_in_Minutes_x_Arrival_Delay_in_Minutes",
+        "Experienced_Delay",
+        "Flight_Distance^2",
+        "Flight_Distance_bins",
+        "Food_SeatComfort",
+        "Food_and_Drink",
+        "Gender_Male",
+        "Gender_TypeOfTravel",
+        "Inflight_Entertainment_x_On-Board_Service",
+        "Online_Boarding",
+        "Online_Boarding_x_Ease_of_Online_booking",
+        "Seat_Comfort_x_Leg_Room",
+    ]
+    train_df = keep_best_features_only(train_df, best_features=best_features)
+    test_df = keep_best_features_only(test_df, best_features=best_features)
 
     # Drop the ID and target before training
     train_x = train_df.drop(columns=["Satisfaction_Rating", "id"])
@@ -99,4 +123,4 @@ if __name__ == "__main__":
     sample_submission_path = "./input/sample_submission.csv"
     submission_dir = "./submission"
 
-    main(train_path, test_path, sample_submission_path, submission_dir, algorithm="lgbm")
+    main(train_path, test_path, sample_submission_path, submission_dir, algorithm="xgb")

@@ -37,12 +37,6 @@ def encode_categorical_data(df):
     df["Class"].replace("Economy", 1, inplace=True)
     df["Class"].replace("Economy Plus", 2, inplace=True)
 
-    # Encode The Grouped Categories
-    # Assuming the dataframe's respective columns have been transformed to categorical types previously
-    df["Age_Group"] = df["Age_Group"].cat.codes
-    df["Departure_Delay_Group"] = df["Departure_Delay_Group"].cat.codes
-    df["Arrival_Delay_Group"] = df["Arrival_Delay_Group"].cat.codes
-
 
 def encode_satisfaction_rating(df):
     df["Satisfaction_Rating"].replace("Neutral / Dissatisfied", 0, inplace=True)
@@ -51,12 +45,45 @@ def encode_satisfaction_rating(df):
 
 def drop_low_importance_features(df):
     drop_features = [
-        "Age",
         "Departure_Delay_in_Minutes",
-        "Arrival_Delay_in_Minutes",
+        "Flight_Distance",
+        "FlightDistance_Class",
+        "Food_and_Drink",
+        "Age_x_Flight_Distance",
+        "Food_SeatComfort",
+        "Inflight_Entertainment",  # assuming this exists based on pattern
+        "Customer_Type_Loyal Customer",  # inverse of "Customer_Type_Non-Loyal Customer"
+        "Gender_Female",  # inverse of "Gender_Male"
+        "Type_of_Travel_Business",  # inverse of "Type_of_Travel_Personal"
+        "Class_Business",  # assuming this exists based on pattern
+        "Online_Support"  # another mock feature
+        # ... you can add more features to drop
     ]
     columns_to_drop = [col for col in drop_features if col in df.columns]
     df.drop(columns=columns_to_drop, inplace=True)
+    return df
+
+
+def keep_best_features_only(df, best_features):
+    """
+    Drops all columns that are not in the best_features list, while ensuring 'Satisfaction_Rating' and 'id' are retained.
+
+    Parameters:
+    - df: The input dataframe.
+    - best_features: List of best feature column names to keep.
+
+    Returns:
+    - Modified dataframe containing only the best features plus 'Satisfaction_Rating' and 'id'.
+    """
+
+    # Always retain these columns
+    always_keep = ["Satisfaction_Rating", "id"]
+
+    # Only drop columns if they are not in best_features and not in always_keep
+    columns_to_drop = [col for col in df.columns if col not in best_features and col not in always_keep]
+
+    df.drop(columns=columns_to_drop, inplace=True)
+
     return df
 
 
@@ -114,34 +141,7 @@ def prepare_data(train_path, test_path):
     # Handle the non-responses in the survey data based on some strategy
     handle_non_responses(train_df=train_df, test_df=test_df)
 
-    # Binning Age
-    bins_age = [0, 18, 35, 50, 65, 100]
-    labels_age = ["0-18", "19-35", "36-50", "51-65", "66-100"]
-    train_df["Age_Group"] = pd.cut(train_df["Age"], bins=bins_age, labels=labels_age, include_lowest=True)
-    test_df["Age_Group"] = pd.cut(test_df["Age"], bins=bins_age, labels=labels_age, include_lowest=True)
-
-    # Binning Delays
-    bins_delays = [-1, 15, 60, 180, 360, float("inf")]
-    labels_delays = ["<15min", "15-60min", "1-3hrs", "3-6hrs", ">6hrs"]
-    train_df["Departure_Delay_Group"] = pd.cut(
-        train_df["Departure_Delay_in_Minutes"], bins=bins_delays, labels=labels_delays, include_lowest=True
-    )
-    train_df["Arrival_Delay_Group"] = pd.cut(
-        train_df["Arrival_Delay_in_Minutes"], bins=bins_delays, labels=labels_delays, include_lowest=True
-    )
-
-    test_df["Departure_Delay_Group"] = pd.cut(
-        test_df["Departure_Delay_in_Minutes"], bins=bins_delays, labels=labels_delays, include_lowest=True
-    )
-    test_df["Arrival_Delay_Group"] = pd.cut(
-        test_df["Arrival_Delay_in_Minutes"], bins=bins_delays, labels=labels_delays, include_lowest=True
-    )
-
-    # Encode the training data
-    encode_categorical_data(train_df)
+    # Encode the Satisfaction Rating
     encode_satisfaction_rating(train_df)
-
-    # Encode the testing data
-    encode_categorical_data(test_df)
 
     return train_df, test_df

@@ -48,6 +48,6 @@ def main(data_path, output_path):
 
 
 if __name__ == "__main__":
-    data_path = "./input/train.csv"
-    output_path = "./output/survey_analysis.txt"
+    data_path = "../input/train.csv"
+    output_path = "../output/survey_analysis.txt"
     main(data_path, output_path)

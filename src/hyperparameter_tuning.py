@@ -34,6 +34,8 @@ def xgb_objective(space):
         gamma=space["gamma"],
         subsample=space["subsample"],
         colsample_bytree=space["colsample_bytree"],
+        # We won't include booster here as we're not considering 'dart'
+        # booster=space["booster"]  # removed this line
     )
     accuracy = cross_val_score(model, space["X"], space["y"], cv=5).mean()
     return {"loss": -accuracy, "status": STATUS_OK}
@@ -67,13 +69,13 @@ def lgbm_objective(space):
 
 def tune_xgb_parameters(X, y, max_evals=100):
     space = {
-        "n_estimators": hp.choice("n_estimators", range(50, 500, 50)),
-        "learning_rate": hp.quniform("learning_rate", 0.01, 0.2, 0.01),
-        "max_depth": hp.choice("max_depth", range(3, 10)),
-        "min_child_weight": hp.choice("min_child_weight", range(1, 6)),
-        "gamma": hp.quniform("gamma", 0, 0.5, 0.01),
-        "subsample": hp.quniform("subsample", 0.5, 1, 0.05),
-        "colsample_bytree": hp.quniform("colsample_bytree", 0.5, 1, 0.05),
+        "n_estimators": hp.choice("n_estimators", range(50, 1000, 50)),  # Expanded to 1000
+        "learning_rate": hp.quniform("learning_rate", 0.001, 0.5, 0.001),  # Expanded range & granularity
+        "max_depth": hp.choice("max_depth", range(2, 15)),  # Expanded range
+        "min_child_weight": hp.choice("min_child_weight", range(1, 8)),  # Expanded range
+        "gamma": hp.quniform("gamma", 0, 0.8, 0.01),  # Expanded upper limit
+        "subsample": hp.quniform("subsample", 0.4, 1, 0.05),  # Expanded range
+        "colsample_bytree": hp.quniform("colsample_bytree", 0.4, 1, 0.05),  # Expanded range
         "X": X,
         "y": y,
     }
@@ -82,9 +84,9 @@ def tune_xgb_parameters(X, y, max_evals=100):
     best_params = fmin(fn=xgb_objective, space=space, algo=tpe.suggest, max_evals=max_evals, trials=trials)
 
     # Convert the indices of 'n_estimators', 'max_depth', and 'min_child_weight' to actual values
-    best_params["n_estimators"] = [50, 100, 150, 200, 250, 300, 350, 400, 450][best_params["n_estimators"]]
-    best_params["max_depth"] = list(range(3, 10))[best_params["max_depth"]]
-    best_params["min_child_weight"] = list(range(1, 6))[best_params["min_child_weight"]]
+    best_params["n_estimators"] = [i for i in range(50, 1000, 50)][best_params["n_estimators"]]
+    best_params["max_depth"] = list(range(2, 15))[best_params["max_depth"]]
+    best_params["min_child_weight"] = list(range(1, 8))[best_params["min_child_weight"]]
     save_hyperparameters("xgb", best_params)
     return best_params
 

@@ -13,9 +13,13 @@ def load_data(train_path, test_path):
 
 
 def handle_missing_data(df):
-    for column in df.columns:
-        mode_val = df[column].mode()[0]
-        df[column].fillna(mode_val, inplace=True)
+    # Fill NA in Arrival Delay Data with the Departure Delay Data
+    df["Arrival_Delay_in_Minuts"] = df["Arrival_Delay_in_Minutes"].fillna(df["Departure_Delay_in_Minutes"])
+
+    # # Fill NA with the mode of the data
+    # for column in df.columns:
+    #     mode_val = df[column].mode()[0]
+    #     df[column].fillna(mode_val, inplace=True)
     return df
 
 

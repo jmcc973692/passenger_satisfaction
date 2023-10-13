@@ -179,8 +179,8 @@ def optimize_feature_selection(train_df):
         fn=partial(objective, train_df=train_df),
         space=space,
         algo=tpe.suggest,
-        max_evals=300,
-        rstate=np.random.default_rng(325),
+        max_evals=200,
+        rstate=np.random.default_rng(555),
         trials=trials,
     )
 

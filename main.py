@@ -52,35 +52,31 @@ def main(train_path, test_path, sample_submission_path, submission_dir, algorith
     # test_df.to_csv("./output/test_full_feature_set.csv", index=False)
 
     best_features = [
-        "Age_x_Inflight_Entertainment",
+        "Age_x_Type_of_Travel_Personal",
         "Baggage_Handling",
         "Check-In_Service",
         "Class_Economy",
         "Class_Economy_Plus_x_Cleanliness",
         "Cleanliness",
-        "Comfort_Score",
-        "Convenience_Score",
         "Convenience_of_Departure/Arrival_Time_",
         "Customer_Type_Non-Loyal_Customer_x_On-Board_Service",
+        "Departure_Delay_in_Minutes",
         "Ease_of_Online_booking",
-        "Flight_Delay_Difference_Lost_Time",
-        "Food_and_Drink",
+        "Flight_Delay_Difference_Made_Up_Time",
+        "Gate_Location",
+        "Inflight_Entertainment",
         "Inflight_Service",
         "Inflight_Wifi_Service",
         "Leg_Room",
+        "On-Board_Service",
+        "Online_Boarding",
         "Online_Boarding_x_Ease_of_Online_booking",
         "Seat_Comfort",
         "Seat_Comfort_x_Leg_Room",
-        "Service_Quality_Score",
         "Type_of_Travel_Personal",
-        "diff_food_cleanliness",
-        "diff_seatcomfort_legroom",
-        "diff_wifi_onlineboarding",
         "Age",
-        "Age^2",
-        "Age^3",
-        "Flight_Distance",
-        "Flight_Distance^2",
+        "Flight_Distance_bins_Long-Haul",
+        "Flight_Distance_bins_Medium-Haul",
     ]
     train_df = keep_best_features_only(train_df, best_features=best_features)
     test_df = keep_best_features_only(test_df, best_features=best_features)
@@ -153,4 +149,4 @@ if __name__ == "__main__":
     sample_submission_path = "./input/sample_submission.csv"
     submission_dir = "./submission"
 
-    main(train_path, test_path, sample_submission_path, submission_dir, algorithm="xgb")
+    main(train_path, test_path, sample_submission_path, submission_dir, algorithm="lgbm")

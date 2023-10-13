@@ -6,6 +6,7 @@ from functools import partial
 import numpy as np
 import pandas as pd
 from hyperopt import STATUS_FAIL, STATUS_OK, Trials, fmin, hp, pyll, rand, tpe
+from lightgbm import LGBMClassifier
 from sklearn.feature_selection import RFECV
 from sklearn.metrics import make_scorer, roc_auc_score
 from sklearn.model_selection import cross_val_score, train_test_split
@@ -20,7 +21,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 evaluated_combinations = set()
 
 # # Default model parameters for XGBClassifier
-# DEFAULT_MODEL_PARAMS = {
+# DEFAULT_MODEL_PARAMS_XGB = {
 #     "objective": "binary:logistic",
 #     "booster": "gbtree",
 #     "learning_rate": 0.03,  # More conservative learning rate
@@ -36,7 +37,7 @@ evaluated_combinations = set()
 #     "lambda": 1,  # L2 regularization
 # }
 
-# DEFAULT_MODEL_PARAMS = {
+# DEFAULT_MODEL_PARAMS_XGB = {
 #     "n_estimators": 100,  # Number of boosting rounds. You can set it to a higher value and rely on early_stopping_rounds to find the optimal number.
 #     "learning_rate": 0.05,  # Makes the optimization more robust and better generalization. Default is 0.3.
 #     "max_depth": 5,  # Maximum depth of a tree. Increasing this will make the model more complex and likely to overfit.
@@ -51,7 +52,7 @@ evaluated_combinations = set()
 # }
 
 # Parameters from leaderboard best model
-DEFAULT_MODEL_PARAMS = {
+DEFAULT_MODEL_PARAMS_XGB = {
     "objective": "binary:logistic",
     "subsample": 0.7,
     "n_estimators": 200,
@@ -60,6 +61,16 @@ DEFAULT_MODEL_PARAMS = {
     "learning_rate": 0.05,
     "gamma": 0,
     "colsample_bytree": 1.0,
+}
+
+DEFAULT_MODEL_PARAMS_LGBM = {
+    "colsample_bytree": 0.55,
+    "learning_rate": 0.03,
+    "max_depth": 14,
+    "min_child_samples": 6,
+    "n_estimators": 300,
+    "num_leaves": 132,
+    "subsample": 0.75,
 }
 
 
@@ -97,10 +108,63 @@ def translate_selections(params):
         pass
     del params["Flight_Distance_Selection"]
 
+    if params["Delay_Selection"] == "numerical":
+        params["Departure_Delay_in_Minutes"] = True
+        params["Arrival_Delay_in_Minutes"] = True
+    elif params["Delay_Selection"] == "total":
+        params["Total_Delay_Minutes"] = True
+    elif params["Delay_Selection"] == "categorical":
+        params["Experienced_Delay"] = True
+    elif params["Delay_Selection"] == "squared":
+        params["Departure_Delay_in_Minutes"] = True
+        params["Arrival_Delay_in_Minutes"] = True
+        params["Departure_Delay_in_Minutes^2"] = True
+        params["Arrival_Delay_in_Minutes^2"] = True
+    elif params["Delay_Selection"] == "cubed":
+        params["Departure_Delay_in_Minutes"] = True
+        params["Arrival_Delay_in_Minutes"] = True
+        params["Departure_Delay_in_Minutes^2"] = True
+        params["Arrival_Delay_in_Minutes^2"] = True
+        params["Departure_Delay_in_Minutes^3"] = True
+        params["Arrival_Delay_in_Minutes^3"] = True
+    else:
+        pass
+    del params["Delay_Selection"]
+
+    if params["Delay_Difference_Selection"] == "numerical":
+        params["Flight_Delay_Difference_Minutes"] = True
+    elif params["Delay_Difference_Selection"] == "bins":
+        params["Flight_Delay_Difference_Made_Up_Time"] = True
+        params["Flight_Delay_Difference_Lost_Time"] = True
+    else:
+        pass
+    del params["Delay_Difference_Selection"]
+
     return params
 
 
-def objective(params, train_df, model_params=DEFAULT_MODEL_PARAMS):
+def objective_lgbm(params, train_df, model_params=DEFAULT_MODEL_PARAMS_LGBM):
+    # Extracting features
+    params = translate_selections(params)
+    features = [k for k, v in params.items() if v]
+    model = LGBMClassifier(**model_params)
+
+    x = train_df[features]
+    y = train_df["Satisfaction_Rating"]
+
+    model.fit(x, y)
+    score = np.mean(cross_val_score(model, x, y, cv=5, scoring="accuracy"))
+
+    # Write to output
+    with open("./output/optimize_feature_results.txt", "a") as f:
+        f.write(f"Features: {features}\n")
+        f.write(f"Score: {-score}\n")
+        f.write("-" * 40 + "\n")
+
+    return {"loss": -score, "status": STATUS_OK}
+
+
+def objective_xgb(params, train_df, model_params=DEFAULT_MODEL_PARAMS_XGB):
     # Extracting features
     params = translate_selections(params)
     features = [k for k, v in params.items() if v]
@@ -127,6 +191,10 @@ def optimize_feature_selection(train_df):
         "Flight_Distance_Selection": hp.choice(
             "Flight_Distance_Selection", ["numerical", "bins", "squared", "cubed", "no_selection"]
         ),
+        "Delay_Selection": hp.choice(
+            "Delay_Selection", ["numerical", "total", "categorical", "squared", "cubed", "no_selection"]
+        ),
+        "Delay_Difference_Selection": hp.choice("Delay_Difference_Selection", ["numerical", "bins", "no_selection"]),
         "Ease_of_Online_booking": hp.choice("Ease_of_Online_booking", [False, True]),
         "Convenience_of_Departure/Arrival_Time_": hp.choice("Convenience_of_Departure/Arrival_Time_", [False, True]),
         "Baggage_Handling": hp.choice("Baggage_Handling", [False, True]),
@@ -141,17 +209,10 @@ def optimize_feature_selection(train_df):
         "Leg_Room": hp.choice("Leg_Room", [False, True]),
         "Inflight_Service": hp.choice("Inflight_Service", [False, True]),
         "Cleanliness": hp.choice("Cleanliness", [False, True]),
-        "Departure_Delay_in_Minutes": hp.choice("Departure_Delay_in_Minutes", [False, True]),
-        "Arrival_Delay_in_Minutes": hp.choice("Arrival_Delay_in_Minutes", [False, True]),
-        "diff_inflight_onboard_service": hp.choice("diff_inflight_onboard_service", [False, True]),
-        "diff_seatcomfort_legroom": hp.choice("diff_seatcomfort_legroom", [False, True]),
-        "diff_wifi_onlineboarding": hp.choice("diff_wifi_onlineboarding", [False, True]),
-        "diff_food_cleanliness": hp.choice("diff_food_cleanliness", [False, True]),
+        "Gender_Male": hp.choice("Gender_Male", [False, True]),
         "Type_of_Travel_Personal": hp.choice("Type_of_Travel_Personal", [False, True]),
         "Class_Economy": hp.choice("Class_Economy", [False, True]),
         "Class_Economy_Plus": hp.choice("Class_Economy_Plus", [False, True]),
-        "Flight_Delay_Difference_Lost_Time": hp.choice("Flight_Delay_Difference_Lost_Time", [False, True]),
-        "Flight_Delay_Difference_Made_Up_Time": hp.choice("Flight_Delay_Difference_Made_Up_Time", [False, True]),
         "Online_Boarding_x_Ease_of_Online_booking": hp.choice(
             "Online_Boarding_x_Ease_of_Online_booking", [False, True]
         ),
@@ -159,8 +220,12 @@ def optimize_feature_selection(train_df):
         "Inflight_Entertainment_x_Flight_Distance": hp.choice(
             "Inflight_Entertainment_x_Flight_Distance", [False, True]
         ),
+        "Food_and_Drink_x_Flight_Distance": hp.choice("Food_and_Drink_x_Flight_Distance", [False, True]),
         "Age_x_Type_of_Travel_Personal": hp.choice("Age_x_Type_of_Travel_Personal", [False, True]),
         "Gender_Male_x_Inflight_Wifi_Service": hp.choice("Gender_Male_x_Inflight_Wifi_Service", [False, True]),
+        "Departure_Delay_in_Minutes_x_Arrival_Delay_in_Minutes": hp.choice(
+            "Departure_Delay_in_Minutes_x_Arrival_Delay_in_Minutes", [False, True]
+        ),
         "Age_x_Inflight_Entertainment": hp.choice("Age_x_Inflight_Entertainment", [False, True]),
         "Class_Economy_x_Cleanliness": hp.choice("Class_Economy_x_Cleanliness", [False, True]),
         "Class_Economy_Plus_x_Cleanliness": hp.choice("Class_Economy_Plus_x_Cleanliness", [False, True]),
@@ -172,23 +237,33 @@ def optimize_feature_selection(train_df):
         "Service_Quality_Score": hp.choice("Service_Quality_Score", [False, True]),
         "Comfort_Score": hp.choice("Comfort_Score", [False, True]),
         "Convenience_Score": hp.choice("Convenience_Score", [False, True]),
+        "diff_inflight_onboard_service": hp.choice("diff_inflight_onboard_service", [False, True]),
+        "diff_seatcomfort_legroom": hp.choice("diff_seatcomfort_legroom", [False, True]),
+        "diff_wifi_onlineboarding": hp.choice("diff_wifi_onlineboarding", [False, True]),
+        "diff_food_cleanliness": hp.choice("diff_food_cleanliness", [False, True]),
     }
 
     trials = Trials()
     optimized = fmin(
-        fn=partial(objective, train_df=train_df),
+        fn=partial(objective_lgbm, train_df=train_df),
         space=space,
         algo=tpe.suggest,
-        max_evals=200,
+        max_evals=1000,
         rstate=np.random.default_rng(555),
         trials=trials,
     )
 
-    age_selections = ["numerical", "bins", "squared", "cubed", "No_Selection"]
-    flight_distance_selections = ["numerical", "bins", "squared", "cubed", "No_Selection"]
+    # Translate Optimized Dictionary Format i.e. {"Age_Selection": 3,...}
+    age_selections = ["numerical", "bins", "squared", "cubed", "no_selection"]
+    flight_distance_selections = ["numerical", "bins", "squared", "cubed", "no_selection"]
+    delay_selections = ["numerical", "total", "categorical", "squared", "cubed", "no_selection"]
+    delay_difference_selections = ["numerical", "bins", "no_selection"]
     optimized["Age_Selection"] = age_selections[optimized["Age_Selection"]]
     optimized["Flight_Distance_Selection"] = flight_distance_selections[optimized["Flight_Distance_Selection"]]
+    optimized["Delay_Selection"] = delay_selections[optimized["Delay_Selection"]]
+    optimized["Delay_Difference_Selection"] = delay_difference_selections[optimized["Delay_Difference_Selection"]]
     optimized = translate_selections(optimized)
+
     best_features = [k for k, v in optimized.items() if v]
     print(f"Best features after optimization are: {best_features}")
 

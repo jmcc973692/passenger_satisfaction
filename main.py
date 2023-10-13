@@ -3,19 +3,21 @@ import os
 import warnings
 from datetime import datetime
 
+# Suppress FutureWarnings
+warnings.simplefilter(action="ignore", category=FutureWarning)
+
+import numpy as np
 import pandas as pd
 import xgboost as xgb
 from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 
-from src.data_handling import keep_best_features_only, prepare_data
+from src.data_handling import drop_low_importance_features, keep_best_features_only, prepare_data
+from src.error_analysis import error_analysis
 from src.feature_engineering import perform_feature_engineering
 from src.hyperparameter_tuning import tune_lgbm_parameters, tune_rf_parameters, tune_xgb_parameters
 from src.submission import load_sample_submission, save_submission, update_submission_structure
-
-# Suppress FutureWarnings
-warnings.filterwarnings("ignore", category=FutureWarning)
 
 
 def get_hyperparameters(algorithm, train_x, train_y):
@@ -45,32 +47,46 @@ def main(train_path, test_path, sample_submission_path, submission_dir, algorith
     train_df = perform_feature_engineering(train_df)
     test_df = perform_feature_engineering(test_df)
 
+    # Uncomment to output a new full feature set csv file including all of the feature engineering
+    # train_df.to_csv("./output/train_full_feature_set.csv", index=False)
+    # test_df.to_csv("./output/test_full_feature_set.csv", index=False)
+
     best_features = [
+        "Age_x_Inflight_Entertainment",
+        "Baggage_Handling",
+        "Check-In_Service",
+        "Class_Economy",
+        "Class_Economy_Plus_x_Cleanliness",
+        "Cleanliness",
+        "Comfort_Score",
+        "Convenience_Score",
+        "Convenience_of_Departure/Arrival_Time_",
+        "Customer_Type_Non-Loyal_Customer_x_On-Board_Service",
+        "Ease_of_Online_booking",
+        "Flight_Delay_Difference_Lost_Time",
+        "Food_and_Drink",
+        "Inflight_Service",
+        "Inflight_Wifi_Service",
+        "Leg_Room",
+        "Online_Boarding_x_Ease_of_Online_booking",
+        "Seat_Comfort",
+        "Seat_Comfort_x_Leg_Room",
+        "Service_Quality_Score",
+        "Type_of_Travel_Personal",
+        "diff_food_cleanliness",
+        "diff_seatcomfort_legroom",
+        "diff_wifi_onlineboarding",
+        "Age",
         "Age^2",
         "Age^3",
-        "Arrival_Delay_in_Minutes",
-        "Arrival_Delay_in_Minutes^2",
-        "Class_Economy",
-        "Class_Economy Plus",
-        "Cleanliness",
-        "Convenience_of_Departure/Arrival_Time_",
-        "Departure_Delay_in_Minutes^2",
-        "Departure_Delay_in_Minutes^3",
-        "Departure_Delay_in_Minutes_x_Arrival_Delay_in_Minutes",
-        "Experienced_Delay",
+        "Flight_Distance",
         "Flight_Distance^2",
-        "Flight_Distance_bins",
-        "Food_SeatComfort",
-        "Food_and_Drink",
-        "Gender_Male",
-        "Gender_TypeOfTravel",
-        "Inflight_Entertainment_x_On-Board_Service",
-        "Online_Boarding",
-        "Online_Boarding_x_Ease_of_Online_booking",
-        "Seat_Comfort_x_Leg_Room",
     ]
     train_df = keep_best_features_only(train_df, best_features=best_features)
     test_df = keep_best_features_only(test_df, best_features=best_features)
+
+    # train_df = drop_low_importance_features(train_df)
+    # test_df = drop_low_importance_features(test_df)
 
     # Drop the ID and target before training
     train_x = train_df.drop(columns=["Satisfaction_Rating", "id"])
@@ -86,12 +102,16 @@ def main(train_path, test_path, sample_submission_path, submission_dir, algorith
         model = LGBMClassifier(**best_params)
 
     print(f"Best parameters for {algorithm}: {best_params}")
-    # Train the model with XGBoost
+
+    # Train the model
     model.fit(train_x, train_y)
 
-    scores = cross_val_score(model, train_x, train_y, cv=5)
-    print("Cross-validated scores:", scores)
-    print("Average score:", scores.mean())
+    # Evaluate Average Cross-Validated accuracy
+    scores = cross_val_score(model, train_x, train_y, cv=5, n_jobs=-1, scoring="accuracy")
+    print(f"Cross-Validation Accuracy Scores: {scores}")
+    # Calculate and print the average accuracy over all folds
+    avg_accuracy = np.mean(scores)
+    print(f"Average cross-validated accuracy: {avg_accuracy:.4f}")
 
     # Evaluate model accuracy on training data
     accuracy = (model.predict(train_x) == train_y).sum() / len(train_y)
@@ -104,6 +124,16 @@ def main(train_path, test_path, sample_submission_path, submission_dir, algorith
 
     importance_df.to_csv("./output/feature-importance.txt", index=False, sep="\t")
 
+    # Model Error Analysis
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=4322)
+    for train_idx, val_idx in skf.split(train_x, train_y):
+        _, X_val = train_x.iloc[train_idx], train_x.iloc[val_idx]
+        _, y_val = train_y.iloc[train_idx], train_y.iloc[val_idx]
+
+    wrong_predictions = error_analysis(X_val, y_val, model)
+    wrong_predictions.to_csv("./output/error_analysis.csv", index=False)
+
+    # Create a Submission with the New Model
     sample_submission_df = load_sample_submission(sample_submission_path)
 
     test_x = test_df.drop(columns=["id"])

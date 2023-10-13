@@ -3,7 +3,7 @@ import pandas as pd
 import seaborn as sns
 
 # Load the training dataset
-train_df = pd.read_csv("../input/train.csv")
+train_df = pd.read_csv("./input/train.csv")
 
 # Data Summary
 print("Data Summary:")

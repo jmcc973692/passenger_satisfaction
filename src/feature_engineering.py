@@ -9,15 +9,43 @@ def scale_numerical_features(df, numerical_features):
     return df
 
 
-def log_transform_features(df, features):
-    for feature in features:
-        df[feature] = np.log(df[feature] + 1)
-    return df
-
-
 def log1p_transform_features(df, features):
     for feature in features:
         df[feature] = np.log1p(df[feature])
+    return df
+
+
+def onehot_encode_features(df, features_to_encode):
+    """
+    One-hot encode the specified columns of a DataFrame using sklearn's OneHotEncoder.
+
+    Parameters:
+    - df (pd.DataFrame): The original DataFrame.
+    - features_to_encode (list): List of columns to be one-hot encoded.
+
+    Returns:
+    - pd.DataFrame: DataFrame with the specified columns one-hot encoded.
+    """
+    encoder = OneHotEncoder(drop=None, sparse=False)
+
+    for feature in features_to_encode:
+        # Fit and transform the feature
+        encoded_data = encoder.fit_transform(df[[feature]])
+
+        # Determine column names
+        if len(df[feature].unique()) == 2:
+            col_names = [f"{feature}_{encoder.categories_[0][1]}"]
+            encoded_data = encoded_data[:, 1:]  # Keep only the second column
+        else:
+            col_names = encoder.get_feature_names_out([feature])
+
+        # Convert to DataFrame and rename columns as necessary
+        encoded_df = pd.DataFrame(encoded_data, columns=col_names).astype(int)
+        encoded_df.columns = encoded_df.columns.str.replace(" ", "_")
+
+        # Drop the original feature from the dataframe and join the encoded DataFrame
+        df = df.drop(feature, axis=1).join(encoded_df)
+
     return df
 
 
@@ -33,39 +61,27 @@ def polynomial_features(df, features):
 def bin_features(df):
     age_bins = [0, 18, 35, 60, 100]
     distance_bins = [0, 500, 1500, 5000]
+    delay_difference_bins = [-np.inf, -5, 5, np.inf]
     df["Age_bins"] = pd.cut(df["Age"], bins=age_bins, labels=["Child", "Young_Adult", "Adult", "Senior"])
     df["Flight_Distance_bins"] = pd.cut(
         df["Flight_Distance"], bins=distance_bins, labels=["Short-Haul", "Medium-Haul", "Long-Haul"]
+    )
+    df["Flight_Delay_Difference"] = pd.cut(
+        df["Flight_Delay_Difference_Minutes"],
+        bins=delay_difference_bins,
+        labels=["Made_Up_Time", "No_Delay_Change", "Lost_Time"],
     )
     return df
 
 
 def encode_categorical_features(df, features):
-    encoder = OneHotEncoder(drop="first", sparse=False)
-    encoded = encoder.fit_transform(df[features])
-    df = pd.concat([df, pd.DataFrame(encoded, columns=encoder.get_feature_names_out(features), index=df.index)], axis=1)
-    df.drop(features, axis=1, inplace=True)
+    for feature in features:
+        df[feature] = df[feature].astype("category").cat.codes + 1
     return df
 
 
-def create_interaction_features(df, feature1, feature2):
+def create_multiplicative_interaction_feature(df, feature1, feature2):
     df[f"{feature1}_x_{feature2}"] = df[feature1] * df[feature2]
-    return df
-
-
-def create_encode_categorical_interaction_features(df):
-    df["Gender_TypeOfTravel"] = df["Gender"].astype(str) + "_" + df["Type_of_Travel"].astype(str)
-    df["FlightDistance_Class"] = df["Flight_Distance"].astype(str) + "_" + df["Class"].astype(str)
-    df["Wifi_OnlineBoarding"] = df["Inflight_Wifi_Service"].astype(str) + "_" + df["Online_Boarding"].astype(str)
-    df["Food_SeatComfort"] = df["Food_and_Drink"].astype(str) + "_" + df["Seat_Comfort"].astype(str)
-    df["OnBoard_InflightService"] = df["On-Board_Service"].astype(str) + "_" + df["Inflight_Service"].astype(str)
-
-    df["Gender_TypeOfTravel"] = df["Gender_TypeOfTravel"].astype("category").cat.codes
-    df["FlightDistance_Class"] = df["FlightDistance_Class"].astype("category").cat.codes
-    df["Wifi_OnlineBoarding"] = df["Wifi_OnlineBoarding"].astype("category").cat.codes
-    df["Food_SeatComfort"] = df["Food_SeatComfort"].astype("category").cat.codes
-    df["OnBoard_InflightService"] = df["OnBoard_InflightService"].astype("category").cat.codes
-
     return df
 
 
@@ -76,48 +92,142 @@ def create_overall_delay_indicator(df):
     return df
 
 
+def create_aggregate_scores(df):
+    # Overall Service Quality Score
+    service_features = [
+        "Ease_of_Online_booking",
+        "Check-In_Service",
+        "Online_Boarding",
+        "Inflight_Wifi_Service",
+        "On-Board_Service",
+        "Inflight_Service",
+    ]
+    df["Service_Quality_Score"] = df[service_features].sum(axis=1)
+
+    # Flight Comfort Score
+    comfort_features = ["Seat_Comfort", "Leg_Room", "Inflight_Entertainment", "Food_and_Drink", "Cleanliness"]
+    df["Comfort_Score"] = df[comfort_features].sum(axis=1)
+
+    # Convenience Score
+    convenience_features = ["Convenience_of_Departure/Arrival_Time_", "Baggage_Handling", "Gate_Location"]
+    df["Convenience_Score"] = df[convenience_features].sum(axis=1)
+
+    return df
+
+
+def frequency_encoding(df, columns):
+    """
+    Perform frequency encoding on specified columns.
+
+    Parameters:
+    - df (pd.DataFrame): Training/Test Data
+    - columns (list): List of columns to perform frequency encoding on
+
+    Returns:
+    - df with frequency encoded columns
+    """
+
+    for column in columns:
+        # Create a frequency map based on the training data
+        freq_map = df[column].value_counts(normalize=True)
+
+        # Map the frequencies onto the dataframes
+        df[column + "_freq"] = df[column].map(freq_map)
+
+    return df
+
+
+def feedback_consistency_check_feature(df):
+    """
+    Add features based on the difference in related feedback columns.
+
+    Parameters:
+    - df (pd.DataFrame): Input data
+
+    Returns:
+    - df with added feedback consistency check features
+    """
+
+    # Create difference features
+    df["diff_inflight_onboard_service"] = df["Inflight_Service"] - df["On-Board_Service"]
+    df["diff_seatcomfort_legroom"] = df["Seat_Comfort"] - df["Leg_Room"]
+    df["diff_wifi_onlineboarding"] = df["Inflight_Wifi_Service"] - df["Online_Boarding"]
+    df["diff_food_cleanliness"] = df["Food_and_Drink"] - df["Cleanliness"]
+
+    return df
+
+
 def check_for_nans(df, stage):
     nans = df.isna().sum().sum()
     print(f"{stage} NaN count: {nans}")
 
 
 def perform_feature_engineering(df):
-    # Bin Features First
+    # Add delay indicator features
+    df = create_overall_delay_indicator(df)
+    df["Total_Delay_Minutes"] = df["Departure_Delay_in_Minutes"] + df["Arrival_Delay_in_Minutes"]
+    df["Flight_Delay_Difference_Minutes"] = df["Arrival_Delay_in_Minutes"] - df["Departure_Delay_in_Minutes"]
+
+    # Bin Features
     df = bin_features(df)
     # check_for_nans(df, "After binning")
 
-    # Convert the categorical bins to integer codes
-    df["Age_bins"] = df["Age_bins"].cat.codes
-    df["Flight_Distance_bins"] = df["Flight_Distance_bins"].cat.codes
+    # # Scaling
+    # df = scale_numerical_features(df, ["Age"])
+    # # check_for_nans(df, "After Scaling")
 
-    # Add overall delay indicator feature
-    df = create_overall_delay_indicator(df)
-
-    # Scaling
-    df = scale_numerical_features(df, ["Age"])
-    # check_for_nans(df, "After Scaling")
-
-    # Log Transform
-    df = log1p_transform_features(df, ["Flight_Distance", "Departure_Delay_in_Minutes", "Arrival_Delay_in_Minutes"])
-    # check_for_nans(df, "After log1p transform")
+    # # Log Transform
+    # df = log1p_transform_features(
+    #     df, ["Flight_Distance", "Departure_Delay_in_Minutes", "Arrival_Delay_in_Minutes", "Total_Delay_Minutes"]
+    # )
+    # # check_for_nans(df, "After log1p transform")
 
     # Polynomial
     df = polynomial_features(df, ["Flight_Distance", "Age", "Departure_Delay_in_Minutes", "Arrival_Delay_in_Minutes"])
     # check_for_nans(df, "After polynomial")
 
-    # Categorical Interaction Features
-    df = create_encode_categorical_interaction_features(df)
-    # check_for_nans(df, "After Categorical Interaction Features")
+    # Create Frequency Encoding Features
+    columns_to_encode = ["Type_of_Travel", "Class", "Gender", "Customer_Type"]
+    df = frequency_encoding(df, columns_to_encode)
+    # check_for_nans(df, "After Frequency Encoding")
 
-    # One-hot encoding
-    df = encode_categorical_features(df, ["Gender", "Customer_Type", "Type_of_Travel", "Class"])
+    # One Hot Encode Categorical Features
+    df = onehot_encode_features(
+        df,
+        [
+            "Gender",
+            "Customer_Type",
+            "Type_of_Travel",
+            "Class",
+            "Age_bins",
+            "Flight_Distance_bins",
+            "Flight_Delay_Difference",
+        ],
+    )
+    # check_for_nans(df, "After One Hot Encoding")
 
-    # Interaction Features
-    df = create_interaction_features(df, "Age", "Flight_Distance")
-    df = create_interaction_features(df, "Online_Boarding", "Ease_of_Online_booking")
-    df = create_interaction_features(df, "Seat_Comfort", "Leg_Room")
-    df = create_interaction_features(df, "Inflight_Entertainment", "On-Board_Service")
-    df = create_interaction_features(df, "Departure_Delay_in_Minutes", "Arrival_Delay_in_Minutes")
+    # Categorical Multiplicative Interaction Features
+    df = create_multiplicative_interaction_feature(df, "Online_Boarding", "Ease_of_Online_booking")
+    df = create_multiplicative_interaction_feature(df, "Seat_Comfort", "Leg_Room")
+    df = create_multiplicative_interaction_feature(df, "Inflight_Entertainment", "Flight_Distance")
+    df = create_multiplicative_interaction_feature(df, "Food_and_Drink", "Flight_Distance")
+    df = create_multiplicative_interaction_feature(df, "Age", "Type_of_Travel_Personal")
+    df = create_multiplicative_interaction_feature(df, "Gender_Male", "Inflight_Wifi_Service")
+    df = create_multiplicative_interaction_feature(df, "Departure_Delay_in_Minutes", "Arrival_Delay_in_Minutes")
+    df = create_multiplicative_interaction_feature(df, "Age", "Inflight_Entertainment")
+    df = create_multiplicative_interaction_feature(df, "Class_Economy", "Cleanliness")
+    df = create_multiplicative_interaction_feature(df, "Class_Economy_Plus", "Cleanliness")
+    df = create_multiplicative_interaction_feature(df, "Customer_Type_Non-Loyal_Customer", "On-Board_Service")
+    df = create_multiplicative_interaction_feature(df, "Class_Economy", "Flight_Distance")
+    df = create_multiplicative_interaction_feature(df, "Class_Economy_Plus", "Flight_Distance")
     # check_for_nans(df, "After Interaction Features")
+
+    # Aggregate Features
+    df = create_aggregate_scores(df)
+    # check_for_nans(df, "After Aggregate Features")
+
+    # Feedback Consistency Features
+    df = feedback_consistency_check_feature(df)
+    # check_for_nans(df, "After Feedback Consistency Features")
 
     return df

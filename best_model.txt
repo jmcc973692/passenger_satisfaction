@@ -28,11 +28,14 @@
 
 lgbm.json
 {
-    "colsample_bytree": 0.55,
-    "learning_rate": 0.03,
-    "max_depth": 14,
-    "min_child_samples": 6,
-    "n_estimators": 300,
-    "num_leaves": 132,
-    "subsample": 0.75
+    "bagging_freq": 2,
+    "colsample_bytree": 0.6986396042821974,
+    "learning_rate": 0.01319766004630036,
+    "max_depth": 21,
+    "min_child_samples": 8,
+    "n_estimators": 900,
+    "num_leaves": 109,
+    "reg_alpha": 0.00011787116004744925,
+    "reg_lambda": 0.06644285765092664,
+    "subsample": 0.783851348243847
 }

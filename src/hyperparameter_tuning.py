@@ -144,15 +144,15 @@ def tune_rf_parameters(X, y, max_evals=100):
     return best_params
 
 
-def tune_lgbm_parameters(X, y, max_evals=100):
+def tune_lgbm_parameters(X, y, max_evals=150):
     space = {
-        "n_estimators": hp.choice("n_estimators", range(50, 500, 50)),
-        "learning_rate": hp.quniform("learning_rate", 0.01, 0.2, 0.01),
-        "max_depth": hp.choice("max_depth", range(3, 15)),
-        "num_leaves": hp.choice("num_leaves", range(20, 150)),
-        "min_child_samples": hp.choice("min_child_samples", range(5, 50)),
-        "subsample": hp.quniform("subsample", 0.5, 1, 0.05),
-        "colsample_bytree": hp.quniform("colsample_bytree", 0.5, 1, 0.05),
+        "n_estimators": hp.choice("n_estimators", range(200, 400, 10)),  # Narrowed around 300
+        "learning_rate": hp.quniform("learning_rate", 0.01, 0.05, 0.005),  # Narrowed around 0.03
+        "max_depth": hp.choice("max_depth", range(10, 20)),  # Narrowed around 14
+        "num_leaves": hp.choice("num_leaves", range(100, 160, 5)),  # Narrowed around 132
+        "min_child_samples": hp.choice("min_child_samples", range(2, 10)),  # Narrowed around 6
+        "subsample": hp.quniform("subsample", 0.6, 0.9, 0.05),  # Narrowed around 0.75
+        "colsample_bytree": hp.quniform("colsample_bytree", 0.5, 0.6, 0.01),  # Narrowed around 0.55
         "X": X,
         "y": y,
     }
@@ -160,9 +160,10 @@ def tune_lgbm_parameters(X, y, max_evals=100):
     trials = Trials()
     best_params = fmin(fn=lgbm_objective, space=space, algo=tpe.suggest, max_evals=max_evals, trials=trials)
 
-    best_params["n_estimators"] = [i for i in range(50, 500, 50)][best_params["n_estimators"]]
-    best_params["max_depth"] = list(range(3, 15))[best_params["max_depth"]]
-    best_params["num_leaves"] = list(range(20, 150))[best_params["num_leaves"]]
-    best_params["min_child_samples"] = list(range(5, 50))[best_params["min_child_samples"]]
+    best_params["n_estimators"] = range(200, 400, 10)[best_params["n_estimators"]]
+    best_params["max_depth"] = range(10, 20)[best_params["max_depth"]]
+    best_params["num_leaves"] = range(100, 160, 5)[best_params["num_leaves"]]
+    best_params["min_child_samples"] = range(2, 10)[best_params["min_child_samples"]]
+
     save_hyperparameters("lgbm", best_params)
     return best_params

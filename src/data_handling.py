@@ -30,53 +30,6 @@ def encode_satisfaction_rating(df):
     df["Satisfaction_Rating"].replace("Satisfied", 1, inplace=True)
 
 
-def drop_low_importance_features(df):
-    drop_features = [
-        "Departure_Delay_in_Minutes",
-        "Departure_Delay_in_Minutes_x_Arrival_Delay_in_Minutes",
-        "Flight_Distance",
-        "Food_and_Drink",
-        "FlightDistance_Class",
-        "On-Board_Service",
-        "Gender_TypeOfTravel",
-        "Gender",
-        "Food_SeatComfort",
-        "Arrival_Delay_in_Minutes",
-        "Age_x_Flight_Distance",
-        "Flight_Distance_bins",
-        "Age_bins",
-        "OnBoard_InflightService",
-        "Seat_Comfort_x_Leg_Room",
-        "Online_Boarding_x_Ease_of_Online_booking",
-    ]
-    columns_to_drop = [col for col in drop_features if col in df.columns]
-    df.drop(columns=columns_to_drop, inplace=True)
-    return df
-
-
-def keep_best_features_only(df, best_features):
-    """
-    Drops all columns that are not in the best_features list, while ensuring 'Satisfaction_Rating' and 'id' are retained.
-
-    Parameters:
-    - df: The input dataframe.
-    - best_features: List of best feature column names to keep.
-
-    Returns:
-    - Modified dataframe containing only the best features plus 'Satisfaction_Rating' and 'id'.
-    """
-
-    # Always retain these columns
-    always_keep = ["Satisfaction_Rating", "id"]
-
-    # Only drop columns if they are not in best_features and not in always_keep
-    columns_to_drop = [col for col in df.columns if col not in best_features and col not in always_keep]
-
-    df.drop(columns=columns_to_drop, inplace=True)
-
-    return df
-
-
 def handle_non_responses(train_df, test_df):
     """
     Replace non-responses in the survey columns based on strategies provided.

@@ -9,8 +9,9 @@ from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 from sklearn.model_selection import cross_val_score
 
-from src.data_handling import drop_low_importance_features, keep_best_features_only, prepare_data
+from src.data_handling import prepare_data
 from src.feature_engineering import perform_feature_engineering
+from src.feature_selection import keep_best_features_only
 from src.submission import load_sample_submission, save_submission, update_submission_structure
 
 # Suppress FutureWarnings
@@ -34,36 +35,8 @@ def main(train_path, test_path, sample_submission_path, submission_dir):
     train_df = perform_feature_engineering(train_df)
     test_df = perform_feature_engineering(test_df)
 
-    best_features = [
-        "Age_x_Type_of_Travel_Personal",
-        "Baggage_Handling",
-        "Check-In_Service",
-        "Class_Economy",
-        "Class_Economy_Plus_x_Cleanliness",
-        "Cleanliness",
-        "Convenience_of_Departure/Arrival_Time_",
-        "Customer_Type_Non-Loyal_Customer_x_On-Board_Service",
-        "Departure_Delay_in_Minutes",
-        "Ease_of_Online_booking",
-        "Flight_Delay_Difference_Made_Up_Time",
-        "Gate_Location",
-        "Inflight_Entertainment",
-        "Inflight_Service",
-        "Inflight_Wifi_Service",
-        "Leg_Room",
-        "On-Board_Service",
-        "Online_Boarding",
-        "Online_Boarding_x_Ease_of_Online_booking",
-        "Seat_Comfort",
-        "Seat_Comfort_x_Leg_Room",
-        "Type_of_Travel_Personal",
-        "Age",
-        "Flight_Distance_bins_Long-Haul",
-        "Flight_Distance_bins_Medium-Haul",
-    ]
-
-    train_df = keep_best_features_only(train_df, best_features=best_features)
-    test_df = keep_best_features_only(test_df, best_features=best_features)
+    train_df = keep_best_features_only(train_df)
+    test_df = keep_best_features_only(test_df)
 
     # Drop the ID and target before training
     train_x = train_df.drop(columns=["Satisfaction_Rating", "id"])

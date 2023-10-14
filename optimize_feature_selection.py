@@ -244,14 +244,26 @@ def optimize_feature_selection(train_df):
     }
 
     trials = Trials()
-    optimized = fmin(
+    fmin(
+        fn=partial(objective_lgbm, train_df=train_df),
+        space=space,
+        algo=rand.suggest,
+        max_evals=500,
+        rstate=np.random.default_rng(393),
+        trials=trials,
+    )
+
+    fmin(
         fn=partial(objective_lgbm, train_df=train_df),
         space=space,
         algo=tpe.suggest,
-        max_evals=1000,
-        rstate=np.random.default_rng(555),
+        max_evals=1200,
+        rstate=np.random.default_rng(5564),
         trials=trials,
     )
+
+    # Final Results
+    optimized = trials.argmin
 
     # Translate Optimized Dictionary Format i.e. {"Age_Selection": 3,...}
     age_selections = ["numerical", "bins", "squared", "cubed", "no_selection"]

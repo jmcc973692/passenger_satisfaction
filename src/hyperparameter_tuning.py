@@ -1,13 +1,16 @@
 import json
 import os
 import warnings
+from functools import partial
 
 # Suppress FutureWarnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
+
 import lightgbm as lgb
+import numpy as np
 import xgboost as xgb
-from hyperopt import STATUS_OK, Trials, fmin, hp, tpe
+from hyperopt import STATUS_OK, Trials, fmin, hp, rand, space_eval, tpe
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score
 
@@ -62,7 +65,7 @@ def rf_objective(space):
     return {"loss": -accuracy, "status": STATUS_OK}
 
 
-def lgbm_objective(space):
+def lgbm_objective(space, X, y):
     model = lgb.LGBMClassifier(
         n_estimators=int(space["n_estimators"]),
         learning_rate=space["learning_rate"],
@@ -71,8 +74,10 @@ def lgbm_objective(space):
         min_child_samples=int(space["min_child_samples"]),
         subsample=space["subsample"],
         colsample_bytree=space["colsample_bytree"],
+        reg_alpha=space["reg_alpha"],
+        reg_lambda=space["reg_lambda"],
     )
-    accuracy = cross_val_score(model, space["X"], space["y"], cv=5).mean()
+    accuracy = cross_val_score(model, X, y, cv=5).mean()
     return {"loss": -accuracy, "status": STATUS_OK}
 
 
@@ -144,26 +149,40 @@ def tune_rf_parameters(X, y, max_evals=100):
     return best_params
 
 
-def tune_lgbm_parameters(X, y, max_evals=150):
+def tune_lgbm_parameters(X, y, max_evals=500):
     space = {
-        "n_estimators": hp.choice("n_estimators", range(200, 400, 10)),  # Narrowed around 300
-        "learning_rate": hp.quniform("learning_rate", 0.01, 0.05, 0.005),  # Narrowed around 0.03
-        "max_depth": hp.choice("max_depth", range(10, 20)),  # Narrowed around 14
-        "num_leaves": hp.choice("num_leaves", range(100, 160, 5)),  # Narrowed around 132
-        "min_child_samples": hp.choice("min_child_samples", range(2, 10)),  # Narrowed around 6
-        "subsample": hp.quniform("subsample", 0.6, 0.9, 0.05),  # Narrowed around 0.75
-        "colsample_bytree": hp.quniform("colsample_bytree", 0.5, 0.6, 0.01),  # Narrowed around 0.55
-        "X": X,
-        "y": y,
+        "n_estimators": hp.choice("n_estimators", range(50, 1000, 10)),
+        "learning_rate": hp.loguniform("learning_rate", np.log(0.0001), np.log(0.1)),
+        "max_depth": hp.choice("max_depth", range(3, 25)),
+        "num_leaves": hp.choice("num_leaves", range(7, 256)),  # Max leaves for depth 8 is 2^8 = 256
+        "min_child_samples": hp.choice("min_child_samples", range(2, 100, 2)),
+        "subsample": hp.uniform("subsample", 0.4, 1.0),
+        "bagging_freq": hp.choice("bagging_freq", range(1, 7)),  # Bagging frequency (1 means every iteration)
+        "colsample_bytree": hp.uniform("colsample_bytree", 0.4, 1.0),
+        "reg_alpha": hp.loguniform("reg_alpha", np.log(0.0001), np.log(2)),
+        "reg_lambda": hp.loguniform("reg_lambda", np.log(0.0001), np.log(2)),
     }
 
     trials = Trials()
-    best_params = fmin(fn=lgbm_objective, space=space, algo=tpe.suggest, max_evals=max_evals, trials=trials)
+    objective = partial(lgbm_objective, X=X, y=y)
+    fmin(
+        fn=objective,
+        space=space,
+        algo=rand.suggest,
+        rstate=np.random.default_rng(4389210),
+        max_evals=125,
+        trials=trials,
+    )
+    fmin(
+        fn=objective,
+        space=space,
+        algo=tpe.suggest,
+        rstate=np.random.default_rng(5543),
+        max_evals=max_evals,
+        trials=trials,
+    )
 
-    best_params["n_estimators"] = range(200, 400, 10)[best_params["n_estimators"]]
-    best_params["max_depth"] = range(10, 20)[best_params["max_depth"]]
-    best_params["num_leaves"] = range(100, 160, 5)[best_params["num_leaves"]]
-    best_params["min_child_samples"] = range(2, 10)[best_params["min_child_samples"]]
+    best_params = space_eval(space, trials.argmin)
 
     save_hyperparameters("lgbm", best_params)
     return best_params

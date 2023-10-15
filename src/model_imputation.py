@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.impute import KNNImputer
+from sklearn.preprocessing import LabelEncoder
 
 
 def handle_non_responses_mode(train_df, test_df):
@@ -105,38 +106,44 @@ def handle_non_responses_knn(train_df, test_df, n_neighbors=5):
     - train_df, test_df with non-responses handled
     """
 
-    # Features to be considered for imputation
-    survey_features = [
+    # Step 1: Identify columns that have 0's and need imputation
+    survey_columns = [
         "Ease_of_Online_booking",
-        "Check-In_Service",
-        "Online_Boarding",
-        "Inflight_Wifi_Service",
-        "On-Board_Service",
-        "Inflight_Service",
-        "Seat_Comfort",
-        "Leg_Room",
-        "Inflight_Entertainment",
-        "Food_and_Drink",
-        "Cleanliness",
         "Convenience_of_Departure/Arrival_Time_",
         "Baggage_Handling",
+        "Check-In_Service",
         "Gate_Location",
+        "Online_Boarding",
+        "Inflight_Wifi_Service",
+        "Food_and_Drink",
+        "Seat_Comfort",
+        "Inflight_Entertainment",
+        "On-Board_Service",
+        "Leg_Room",
+        "Inflight_Service",
+        "Cleanliness",
     ]
 
-    # Replace 0 with NaN in survey columns for both training and test data
-    for df in [train_df, test_df]:
-        df[survey_features] = df[survey_features].replace(0, np.nan)
+    # Step 2: Temporarily preprocess data for KNN imputation
+    temp_train = train_df.copy()
+    temp_test = test_df.copy()
 
-    # Use KNN imputation to replace NaNs
-    imputer = KNNImputer(n_neighbors=n_neighbors)
+    # Label encoding categorical columns for KNN
+    categorical_columns = ["Gender", "Customer_Type", "Type_of_Travel", "Class"]
+    for col in categorical_columns:
+        le = LabelEncoder()
+        temp_train[col] = le.fit_transform(temp_train[col])
+        temp_test[col] = le.transform(temp_test[col])
 
-    # Impute training data
-    train_imputed = imputer.fit_transform(train_df)
-    train_df = pd.DataFrame(train_imputed, columns=train_df.columns)
+    # Step 3: Apply KNN imputation on selected columns
+    imputer = KNNImputer(n_neighbors=n_neighbors, missing_values=0)
+    temp_train[survey_columns] = imputer.fit_transform(temp_train[survey_columns])
+    temp_test[survey_columns] = imputer.transform(temp_test[survey_columns])
 
-    # Impute test data
-    test_imputed = imputer.transform(test_df)
-    test_df = pd.DataFrame(test_imputed, columns=test_df.columns)
+    # Step 4: Replace only the survey columns in original dataframes
+    for col in survey_columns:
+        train_df[col] = temp_train[col]
+        test_df[col] = temp_test[col]
 
     return train_df, test_df
 
@@ -148,4 +155,6 @@ def handle_0_responses(train_df, test_df, strategy="knn"):
         train_df, test_df = handle_non_responses_group(train_df, test_df)
     elif strategy == "mode":
         train_df, test_df = handle_non_responses_mode(train_df, test_df)
+    else:
+        pass
     return train_df, test_df

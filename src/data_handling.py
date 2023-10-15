@@ -1,6 +1,6 @@
 import pandas as pd
 
-from model_imputation import handle_0_responses
+from src.model_imputation import handle_0_responses
 
 
 def load_data(train_path, test_path):
@@ -40,7 +40,7 @@ def prepare_data(train_path, test_path):
     handle_missing_data(test_df)
 
     # Handle the non-responses in the survey data based on some strategy
-    handle_0_responses(train_df=train_df, test_df=test_df, strategy="knn")
+    handle_0_responses(train_df=train_df, test_df=test_df, strategy="none")
 
     # Encode the Satisfaction Rating
     encode_satisfaction_rating(train_df)

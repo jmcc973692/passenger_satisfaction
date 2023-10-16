@@ -5,14 +5,14 @@ from functools import partial
 
 import numpy as np
 import pandas as pd
-from hyperopt import STATUS_FAIL, STATUS_OK, Trials, fmin, hp, pyll, rand, tpe
+from hyperopt import STATUS_FAIL, STATUS_OK, Trials, fmin, hp, pyll, rand, space_eval, tpe
 from lightgbm import LGBMClassifier
 from sklearn.feature_selection import RFECV
 from sklearn.metrics import make_scorer, roc_auc_score
 from sklearn.model_selection import cross_val_score, train_test_split
 from xgboost import XGBClassifier
 
-from src.data_handling import drop_low_importance_features, prepare_data
+from src.data_handling import prepare_data
 from src.feature_engineering import perform_feature_engineering
 
 # Suppress FutureWarnings
@@ -63,14 +63,27 @@ DEFAULT_MODEL_PARAMS_XGB = {
     "colsample_bytree": 1.0,
 }
 
+# DEFAULT_MODEL_PARAMS_LGBM = {
+#     "colsample_bytree": 0.55,
+#     "learning_rate": 0.03,
+#     "max_depth": 14,
+#     "min_child_samples": 6,
+#     "n_estimators": 300,
+#     "num_leaves": 132,
+#     "subsample": 0.75,
+# }
+
 DEFAULT_MODEL_PARAMS_LGBM = {
-    "colsample_bytree": 0.55,
-    "learning_rate": 0.03,
-    "max_depth": 14,
-    "min_child_samples": 6,
-    "n_estimators": 300,
-    "num_leaves": 132,
-    "subsample": 0.75,
+    "bagging_freq": 2,
+    "colsample_bytree": 0.6986396042821974,
+    "learning_rate": 0.01319766004630036,
+    "max_depth": 21,
+    "min_child_samples": 8,
+    "n_estimators": 900,
+    "num_leaves": 109,
+    "reg_alpha": 0.00011787116004744925,
+    "reg_lambda": 0.06644285765092664,
+    "subsample": 0.783851348243847,
 }
 
 
@@ -248,7 +261,7 @@ def optimize_feature_selection(train_df):
         fn=partial(objective_lgbm, train_df=train_df),
         space=space,
         algo=rand.suggest,
-        max_evals=500,
+        max_evals=250,
         rstate=np.random.default_rng(393),
         trials=trials,
     )
@@ -257,31 +270,21 @@ def optimize_feature_selection(train_df):
         fn=partial(objective_lgbm, train_df=train_df),
         space=space,
         algo=tpe.suggest,
-        max_evals=1200,
+        max_evals=750,
         rstate=np.random.default_rng(5564),
         trials=trials,
     )
 
     # Final Results
-    optimized = trials.argmin
-
-    # Translate Optimized Dictionary Format i.e. {"Age_Selection": 3,...}
-    age_selections = ["numerical", "bins", "squared", "cubed", "no_selection"]
-    flight_distance_selections = ["numerical", "bins", "squared", "cubed", "no_selection"]
-    delay_selections = ["numerical", "total", "categorical", "squared", "cubed", "no_selection"]
-    delay_difference_selections = ["numerical", "bins", "no_selection"]
-    optimized["Age_Selection"] = age_selections[optimized["Age_Selection"]]
-    optimized["Flight_Distance_Selection"] = flight_distance_selections[optimized["Flight_Distance_Selection"]]
-    optimized["Delay_Selection"] = delay_selections[optimized["Delay_Selection"]]
-    optimized["Delay_Difference_Selection"] = delay_difference_selections[optimized["Delay_Difference_Selection"]]
-    optimized = translate_selections(optimized)
-
-    best_features = [k for k, v in optimized.items() if v]
+    best_features = space_eval(space, trials.argmin)
+    best_features = translate_selections(best_features)
+    best_features = [k for k, v in best_features.items() if v]
     print(f"Best features after optimization are: {best_features}")
 
     # Save results to a file in the ./output directory
     with open("./output/best_features.txt", "w") as file:
-        file.write(", ".join(best_features))
+        formatted_features = ", ".join(f'"{feature}"' for feature in best_features)
+        file.write(f"[{formatted_features}]")
 
 
 if __name__ == "__main__":

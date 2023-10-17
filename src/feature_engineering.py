@@ -231,3 +231,32 @@ def perform_feature_engineering(df):
     # check_for_nans(df, "After Feedback Consistency Features")
 
     return df
+
+
+def perform_feature_engineering_nn(df):
+    # Separate the Data into Data Types
+    numerical_columns = ["Age", "Flight_Distance", "Departure_Delay_in_Minutes", "Arrival_Delay_in_Minutes"]
+    categorical_columns = ["Gender", "Customer_Type", "Type_of_Travel", "Class"]
+    service_features = [
+        "Ease_of_Online_booking",
+        "Check-In_Service",
+        "Online_Boarding",
+        "Inflight_Wifi_Service",
+        "On-Board_Service",
+        "Inflight_Service",
+        "Seat_Comfort",
+        "Leg_Room",
+        "Inflight_Entertainment",
+        "Food_and_Drink",
+        "Cleanliness",
+        "Convenience_of_Departure/Arrival_Time_",
+        "Baggage_Handling",
+        "Gate_Location",
+    ]
+
+    df = pd.get_dummies(df, columns=categorical_columns, drop_first=True, dtype=int)
+    df = pd.get_dummies(df, columns=service_features, drop_first=True, dtype=int)
+
+    df = scale_numerical_features(df, numerical_columns)
+
+    return df

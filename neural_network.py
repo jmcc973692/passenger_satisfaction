@@ -3,7 +3,7 @@ from datetime import datetime
 
 import torch
 from sklearn.model_selection import train_test_split
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import CosineAnnealingLR, ReduceLROnPlateau
 from torch.utils.data import DataLoader, TensorDataset
 
 from src.data_handling import prepare_data
@@ -48,10 +48,10 @@ def main(train_path, test_path, sample_submission_path, submission_dir):
     batch_size = 64  # You can adjust this value
 
     train_dataset = TensorDataset(x_train, y_train)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=6)
 
     val_dataset = TensorDataset(x_val, y_val)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, num_workers=6)
 
     input_dim = train_x.shape[1]
     model = TabularNN(input_dim)
@@ -65,10 +65,13 @@ def main(train_path, test_path, sample_submission_path, submission_dir):
     best_val_loss = float("inf")
     epochs_no_improve = 0
 
+    # Scheulder Parameters
+    T_max = 40
+
     # Loss and optimizer
     criterion = torch.nn.BCELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.1, patience=5, verbose=True)
+    scheduler = CosineAnnealingLR(optimizer=optimizer, T_max=T_max, verbose=True)
 
     epochs = 1000
     # Training loop
@@ -86,7 +89,7 @@ def main(train_path, test_path, sample_submission_path, submission_dir):
 
             running_loss += loss.item()
 
-        print(f"Epoch [{epoch+1}/{epochs}], Training Loss: {running_loss/len(train_loader):.4f}")
+        print(f"Epoch [{epoch+1}], Training Loss: {running_loss/len(train_loader):.4f}")
 
         # Validation loop
         model.eval()
@@ -97,14 +100,15 @@ def main(train_path, test_path, sample_submission_path, submission_dir):
                 loss = criterion(outputs, batch_labels)
                 val_loss += loss.item()
 
-        print(f"Epoch [{epoch+1}/{epochs}], Validation Loss: {val_loss/len(val_loader):.4f}")
+        print(f"Epoch [{epoch+1}], Validation Loss: {val_loss/len(val_loader):.4f}")
 
         # Step the Scheduler
-        scheduler.step(val_loss)
+        scheduler.step()
 
         # Check if the validation loss improved
         if val_loss < best_val_loss:
             best_val_loss = val_loss
+            best_model_weights = model.state_dict().copy()
             epochs_no_improve = 0  # Reset the Counter
         else:
             epochs_no_improve += 1
@@ -113,6 +117,7 @@ def main(train_path, test_path, sample_submission_path, submission_dir):
             print("Early Stopping!")
             break
 
+    model.load_state_dict(best_model_weights)
     with torch.no_grad():
         model.eval()
 

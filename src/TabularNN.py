@@ -1,5 +1,4 @@
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class TabularNN(nn.Module):
@@ -7,28 +6,22 @@ class TabularNN(nn.Module):
         super(TabularNN, self).__init__()
 
         # Define layers
-        self.layer1 = nn.Linear(input_dim, 512)
-        self.bn1 = nn.BatchNorm1d(512)
-
-        self.layer2 = nn.Linear(512, 256)
-        self.bn2 = nn.BatchNorm1d(256)
-        self.res1 = nn.Linear(512, 256)  # Residual connection for layer2
-
-        self.layer3 = nn.Linear(256, 256)
-        self.bn3 = nn.BatchNorm1d(256)
-
-        self.layer4 = nn.Linear(256, 128)
+        self.layer1 = nn.Linear(input_dim, 256)
+        self.bn1 = nn.BatchNorm1d(256)
+        self.layer2 = nn.Linear(256, 128)
+        self.bn2 = nn.BatchNorm1d(128)
+        self.layer3 = nn.Linear(128, 128)
+        self.bn3 = nn.BatchNorm1d(128)
+        self.layer4 = nn.Linear(128, 128)
         self.bn4 = nn.BatchNorm1d(128)
-        self.res2 = nn.Linear(256, 128)  # Residual connection for layer4
-
-        self.layer5 = nn.Linear(128, 128)
-        self.bn5 = nn.BatchNorm1d(128)
-
-        self.layer6 = nn.Linear(128, 64)
+        self.downsample = nn.Linear(128, 64)  # Downsample layer
+        self.layer5 = nn.Linear(128, 64)
+        self.bn5 = nn.BatchNorm1d(64)
+        self.layer6 = nn.Linear(64, 64)
         self.bn6 = nn.BatchNorm1d(64)
-        self.res3 = nn.Linear(128, 64)  # Residual connection for layer6
-
-        self.output_layer = nn.Linear(64, 1)
+        self.layer7 = nn.Linear(64, 32)
+        self.bn7 = nn.BatchNorm1d(32)
+        self.output_layer = nn.Linear(32, 1)
 
         # Activation and dropout
         self.relu = nn.ReLU()
@@ -36,41 +29,41 @@ class TabularNN(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        x = self.layer1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.dropout(x)
+        x1 = self.layer1(x)
+        x1 = self.bn1(x1)
+        x1 = self.relu(x1)
+        x1 = self.dropout(x1)
 
-        # Store the output for residual connection
-        res1_output = x
-        x = self.layer2(x)
-        x = self.bn2(x)
-        x = self.relu(x + self.res1(res1_output))
-        x = self.dropout(x)
+        x2 = self.layer2(x1)
+        x2 = self.bn2(x2)
+        x2 = self.relu(x2)
+        x2 = self.dropout(x2)
 
-        x = self.layer3(x)
-        x = self.bn3(x)
-        x = self.relu(x)
-        x = self.dropout(x)
+        x3 = self.layer3(x2)
+        x3 = self.bn3(x3)
+        x3 = self.relu(x3)
+        x3 = self.dropout(x3)
 
-        # Store the output for residual connection
-        res2_output = x
-        x = self.layer4(x)
-        x = self.bn4(x)
-        x = self.relu(x + self.res2(res2_output))
-        x = self.dropout(x)
+        x4 = self.layer4(x3) + x2  # residual connection
+        x4 = self.bn4(x4)
+        x4 = self.relu(x4)
+        x4 = self.dropout(x4)
 
-        x = self.layer5(x)
-        x = self.bn5(x)
-        x = self.relu(x)
-        x = self.dropout(x)
+        x5 = self.layer5(x4)
+        x5 = self.bn5(x5)
+        x5 = self.relu(x5)
+        x5 = self.dropout(x5)
 
-        # Store the output for residual connection
-        res3_output = x
-        x = self.layer6(x)
-        x = self.bn6(x)
-        x = self.relu(x + self.res3(res3_output))
-        x = self.dropout(x)
+        x_downsampled = self.downsample(x4)
+        x6 = self.layer6(x5) + x_downsampled  # residual connection
+        x6 = self.bn6(x6)
+        x6 = self.relu(x6)
+        x6 = self.dropout(x6)
 
-        x = self.sigmoid(self.output_layer(x))
-        return x
+        x7 = self.layer7(x6)
+        x7 = self.bn7(x7)
+        x7 = self.relu(x7)
+        x7 = self.dropout(x7)
+
+        x_out = self.sigmoid(self.output_layer(x7))
+        return x_out

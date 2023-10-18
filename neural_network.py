@@ -58,7 +58,7 @@ def main(train_path, test_path, sample_submission_path, submission_dir):
 
     # Hyperparameters
     learning_rate = 0.001
-    weight_decay = 0
+    weight_decay = 1e-5
 
     # Early stopping parameters
     patience = 10  # number of epochs to wait for improvement before terminating

@@ -137,6 +137,50 @@ def frequency_encoding(df, columns):
     return df
 
 
+def one_hot_encode_survey_features(df):
+    """
+    One-hot-encodes specified columns with values 1-5, dropping the 0 feature.
+
+    Args:
+    - df (pd.DataFrame): DataFrame with the columns to be encoded.
+
+    Returns:
+    - pd.DataFrame: One-hot-encoded DataFrame.
+    """
+
+    columns = [
+        "Ease_of_Online_booking",
+        "Convenience_of_Departure/Arrival_Time_",
+        "Baggage_Handling",
+        "Check-In_Service",
+        "Gate_Location",
+        "Online_Boarding",
+        "Inflight_Wifi_Service",
+        "Food_and_Drink",
+        "Seat_Comfort",
+        "Inflight_Entertainment",
+        "On-Board_Service",
+        "Leg_Room",
+        "Inflight_Service",
+        "Cleanliness",
+    ]
+
+    for col in columns:
+        # Ensure the column has categories 1-5, even if they are not present
+        dummies = pd.get_dummies(df[col], prefix=col, prefix_sep="_", dtype=int)
+        for i in range(1, 6):
+            if f"{col}_{i}" not in dummies.columns:
+                dummies[f"{col}_{i}"] = 0
+
+        # Drop the 0 feature to avoid collinearity
+        dummies.drop(columns=[f"{col}_0"], errors="ignore", inplace=True)
+
+        # Replace the original column with the encoded columns
+        df = pd.concat([df.drop(columns=[col]), dummies], axis=1)
+
+    return df
+
+
 def feedback_consistency_check_feature(df):
     """
     Add features based on the difference in related feedback columns.
@@ -237,25 +281,9 @@ def perform_feature_engineering_nn(df):
     # Separate the Data into Data Types
     numerical_columns = ["Age", "Flight_Distance", "Departure_Delay_in_Minutes", "Arrival_Delay_in_Minutes"]
     categorical_columns = ["Gender", "Customer_Type", "Type_of_Travel", "Class"]
-    service_features = [
-        "Ease_of_Online_booking",
-        "Check-In_Service",
-        "Online_Boarding",
-        "Inflight_Wifi_Service",
-        "On-Board_Service",
-        "Inflight_Service",
-        "Seat_Comfort",
-        "Leg_Room",
-        "Inflight_Entertainment",
-        "Food_and_Drink",
-        "Cleanliness",
-        "Convenience_of_Departure/Arrival_Time_",
-        "Baggage_Handling",
-        "Gate_Location",
-    ]
 
     df = pd.get_dummies(df, columns=categorical_columns, drop_first=True, dtype=int)
-    df = pd.get_dummies(df, columns=service_features, drop_first=True, dtype=int)
+    df = one_hot_encode_survey_features(df)
 
     df = scale_numerical_features(df, numerical_columns)
 

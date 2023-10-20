@@ -9,6 +9,7 @@ venv/
 
 # Exclude .vscode directory
 .vscode/
+.VSCodeCounter/
 
 # Exclude output directories
 submission/

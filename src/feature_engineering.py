@@ -287,4 +287,5 @@ def perform_feature_engineering_nn(df):
 
     df = scale_numerical_features(df, numerical_columns)
 
+    df.columns = df.columns.str.replace(" ", "_")
     return df

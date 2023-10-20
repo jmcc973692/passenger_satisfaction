@@ -165,7 +165,6 @@ def objective_lgbm(params, train_df, model_params=DEFAULT_MODEL_PARAMS_LGBM):
     x = train_df[features]
     y = train_df["Satisfaction_Rating"]
 
-    model.fit(x, y)
     score = np.mean(cross_val_score(model, x, y, cv=5, scoring="accuracy"))
 
     # Write to output
@@ -186,7 +185,6 @@ def objective_xgb(params, train_df, model_params=DEFAULT_MODEL_PARAMS_XGB):
     x = train_df[features]
     y = train_df["Satisfaction_Rating"]
 
-    model.fit(x, y)
     score = np.mean(cross_val_score(model, x, y, cv=5, scoring="accuracy"))
 
     # Write to output

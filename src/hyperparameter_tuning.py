@@ -48,7 +48,6 @@ def xgb_objective(space):
         grow_policy=space["grow_policy"],
     )
 
-    model.fit(space["X"], space["y"])
     accuracy = cross_val_score(model, space["X"], space["y"], cv=5, scoring="accuracy").mean()
     return {"loss": -accuracy, "status": STATUS_OK}
 
@@ -73,11 +72,12 @@ def lgbm_objective(space, X, y):
         num_leaves=int(space["num_leaves"]),
         min_child_samples=int(space["min_child_samples"]),
         subsample=space["subsample"],
+        bagging_freq=space["bagging_freq"],
         colsample_bytree=space["colsample_bytree"],
         reg_alpha=space["reg_alpha"],
         reg_lambda=space["reg_lambda"],
     )
-    accuracy = cross_val_score(model, X, y, cv=5).mean()
+    accuracy = cross_val_score(model, X, y, cv=5, n_jobs=-1).mean()
     return {"loss": -accuracy, "status": STATUS_OK}
 
 
@@ -151,16 +151,16 @@ def tune_rf_parameters(X, y, max_evals=100):
 
 def tune_lgbm_parameters(X, y, max_evals=500):
     space = {
-        "n_estimators": hp.choice("n_estimators", range(50, 1000, 10)),
-        "learning_rate": hp.loguniform("learning_rate", np.log(0.0001), np.log(0.1)),
-        "max_depth": hp.choice("max_depth", range(3, 25)),
-        "num_leaves": hp.choice("num_leaves", range(7, 256)),  # Max leaves for depth 8 is 2^8 = 256
-        "min_child_samples": hp.choice("min_child_samples", range(2, 100, 2)),
-        "subsample": hp.uniform("subsample", 0.4, 1.0),
-        "bagging_freq": hp.choice("bagging_freq", range(1, 7)),  # Bagging frequency (1 means every iteration)
-        "colsample_bytree": hp.uniform("colsample_bytree", 0.4, 1.0),
-        "reg_alpha": hp.loguniform("reg_alpha", np.log(0.0001), np.log(2)),
-        "reg_lambda": hp.loguniform("reg_lambda", np.log(0.0001), np.log(2)),
+        "n_estimators": hp.choice("n_estimators", range(800, 1100, 10)),
+        "learning_rate": hp.loguniform("learning_rate", np.log(0.005), np.log(0.02)),
+        "max_depth": hp.choice("max_depth", range(18, 25)),
+        "num_leaves": hp.choice("num_leaves", range(80, 140)),
+        "min_child_samples": hp.choice("min_child_samples", range(5, 12)),
+        "subsample": hp.uniform("subsample", 0.75, 0.85),
+        "bagging_freq": hp.choice("bagging_freq", [0, 1, 2, 3, 4]),
+        "colsample_bytree": hp.uniform("colsample_bytree", 0.65, 0.75),
+        "reg_alpha": hp.loguniform("reg_alpha", np.log(0.00005), np.log(0.0005)),
+        "reg_lambda": hp.loguniform("reg_lambda", np.log(0.05), np.log(0.08)),
     }
 
     trials = Trials()

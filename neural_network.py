@@ -39,7 +39,7 @@ def main(train_path, test_path, sample_submission_path, submission_dir):
     train_x_tensor = torch.FloatTensor(train_x.values)
     train_y_tensor = torch.FloatTensor(train_y.values).unsqueeze(1)  # Convert to 2D tensor
     # Convert test data to tensor
-    test_x_tensor = torch.FloatTensor(test_df.values)  # Assuming 'id' column is present in test_df
+    test_x_tensor = torch.FloatTensor(test_df.values)
 
     # Split data
     x_train, x_val, y_train, y_val = train_test_split(train_x_tensor, train_y_tensor, test_size=0.2, random_state=42)
@@ -126,7 +126,7 @@ def main(train_path, test_path, sample_submission_path, submission_dir):
         print(f"Final Training Accuracy: {train_accuracy:.4f}")
 
     # Save model
-    torch.save(model.state_dict(), "./models/nn_model.pt")
+    torch.save(model, "./models/nn_model.pt")
 
     # Load sample submission
     sample_submission_df = load_sample_submission(sample_submission_path)

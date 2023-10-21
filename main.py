@@ -15,7 +15,7 @@ from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test
 
 from src.data_handling import prepare_data
 from src.error_analysis import error_analysis
-from src.feature_engineering import perform_feature_engineering
+from src.feature_engineering import perform_feature_engineering_nn
 from src.feature_selection import keep_best_features_only
 from src.hyperparameter_tuning import tune_lgbm_parameters, tune_rf_parameters, tune_xgb_parameters
 from src.submission import load_sample_submission, save_submission, update_submission_structure
@@ -45,15 +45,15 @@ def main(train_path, test_path, sample_submission_path, submission_dir, algorith
     train_df, test_df = prepare_data(train_path, test_path)
 
     # Feature Engineering Steps
-    train_df = perform_feature_engineering(train_df)
-    test_df = perform_feature_engineering(test_df)
+    train_df = perform_feature_engineering_nn(train_df)
+    test_df = perform_feature_engineering_nn(test_df)
 
     # Uncomment to output a new full feature set csv file including all of the feature engineering
     # train_df.to_csv("./output/train_full_feature_set.csv", index=False)
     # test_df.to_csv("./output/test_full_feature_set.csv", index=False)
 
-    train_df = keep_best_features_only(train_df)
-    test_df = keep_best_features_only(test_df)
+    # train_df = keep_best_features_only(train_df)
+    # test_df = keep_best_features_only(test_df)
 
     # train_df = drop_low_importance_features(train_df)
     # test_df = drop_low_importance_features(test_df)
@@ -123,4 +123,4 @@ if __name__ == "__main__":
     sample_submission_path = "./input/sample_submission.csv"
     submission_dir = "./submission"
 
-    main(train_path, test_path, sample_submission_path, submission_dir, algorithm="lgbm")
+    main(train_path, test_path, sample_submission_path, submission_dir, algorithm="xgb")

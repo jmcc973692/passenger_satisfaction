@@ -284,8 +284,8 @@ def perform_feature_engineering_nn(df):
 
     df = pd.get_dummies(df, columns=categorical_columns, drop_first=True, dtype=int)
     df = one_hot_encode_survey_features(df)
+    df.columns = df.columns.str.replace(" ", "_")
 
     df = scale_numerical_features(df, numerical_columns)
 
-    df.columns = df.columns.str.replace(" ", "_")
     return df

@@ -1,18 +1,23 @@
 import json
 import os
+import pickle
 import warnings
 from functools import partial
 
 # Suppress FutureWarnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-
 import lightgbm as lgb
 import numpy as np
+import torch.nn as nn
+import torch.optim
 import xgboost as xgb
 from hyperopt import STATUS_OK, Trials, fmin, hp, rand, space_eval, tpe
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score
+from torch.utils.data import DataLoader, TensorDataset
+
+from src.TabularNN import TabularNN
 
 
 # Function to save hyperparameters
@@ -49,35 +54,6 @@ def xgb_objective(space):
     )
 
     accuracy = cross_val_score(model, space["X"], space["y"], cv=5, scoring="accuracy").mean()
-    return {"loss": -accuracy, "status": STATUS_OK}
-
-
-def rf_objective(space):
-    model = RandomForestClassifier(
-        n_estimators=int(space["n_estimators"]),
-        max_depth=int(space["max_depth"]),
-        min_samples_split=int(space["min_samples_split"]),
-        min_samples_leaf=int(space["min_samples_leaf"]),
-        max_features=space["max_features"],
-    )
-    accuracy = cross_val_score(model, space["X"], space["y"], cv=5).mean()
-    return {"loss": -accuracy, "status": STATUS_OK}
-
-
-def lgbm_objective(space, X, y):
-    model = lgb.LGBMClassifier(
-        n_estimators=int(space["n_estimators"]),
-        learning_rate=space["learning_rate"],
-        max_depth=int(space["max_depth"]),
-        num_leaves=int(space["num_leaves"]),
-        min_child_samples=int(space["min_child_samples"]),
-        subsample=space["subsample"],
-        bagging_freq=space["bagging_freq"],
-        colsample_bytree=space["colsample_bytree"],
-        reg_alpha=space["reg_alpha"],
-        reg_lambda=space["reg_lambda"],
-    )
-    accuracy = cross_val_score(model, X, y, cv=5, n_jobs=-1).mean()
     return {"loss": -accuracy, "status": STATUS_OK}
 
 
@@ -126,6 +102,18 @@ def tune_xgb_parameters(X, y, max_evals=200):  # Increased max_evals
     return best_params
 
 
+def rf_objective(space):
+    model = RandomForestClassifier(
+        n_estimators=int(space["n_estimators"]),
+        max_depth=int(space["max_depth"]),
+        min_samples_split=int(space["min_samples_split"]),
+        min_samples_leaf=int(space["min_samples_leaf"]),
+        max_features=space["max_features"],
+    )
+    accuracy = cross_val_score(model, space["X"], space["y"], cv=5).mean()
+    return {"loss": -accuracy, "status": STATUS_OK}
+
+
 def tune_rf_parameters(X, y, max_evals=100):
     space = {
         "n_estimators": hp.choice("n_estimators", range(50, 500, 50)),
@@ -147,6 +135,23 @@ def tune_rf_parameters(X, y, max_evals=100):
     best_params["max_features"] = ["auto", "sqrt", "log2"][best_params["max_features"]]
     save_hyperparameters("rf", best_params)
     return best_params
+
+
+def lgbm_objective(space, X, y):
+    model = lgb.LGBMClassifier(
+        n_estimators=int(space["n_estimators"]),
+        learning_rate=space["learning_rate"],
+        max_depth=int(space["max_depth"]),
+        num_leaves=int(space["num_leaves"]),
+        min_child_samples=int(space["min_child_samples"]),
+        subsample=space["subsample"],
+        bagging_freq=space["bagging_freq"],
+        colsample_bytree=space["colsample_bytree"],
+        reg_alpha=space["reg_alpha"],
+        reg_lambda=space["reg_lambda"],
+    )
+    accuracy = cross_val_score(model, X, y, cv=5, n_jobs=-1).mean()
+    return {"loss": -accuracy, "status": STATUS_OK}
 
 
 def tune_lgbm_parameters(X, y, max_evals=500):
@@ -186,3 +191,250 @@ def tune_lgbm_parameters(X, y, max_evals=500):
 
     save_hyperparameters("lgbm", best_params)
     return best_params
+
+
+def nn_objective(space, X_train, y_train, X_val, y_val, X_test, y_test, device):
+    # Unpack the Space
+    batch_size = space["batch_size"]
+    dropout_rate = space["dropout"]
+    factor = space["factor"]
+    scheduler_patience = space["patience"]
+    activation_functions = {
+        "relu": nn.ReLU(),
+        "leaky_relu": nn.LeakyReLU(),
+        "elu": nn.ELU(),
+        "sigmoid": nn.Sigmoid(),
+        "tanh": nn.Tanh(),
+        "swish": nn.SiLU(),  # SiLU (Swish) was added in PyTorch 1.7.0 as nn.SiLU()
+    }
+    activation_func = activation_functions[space["activation"]]
+
+    # Create DataLoader Objects
+    train_dataset = TensorDataset(X_train, y_train)
+    train_loader = DataLoader(
+        train_dataset, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=10, persistent_workers=True
+    )
+
+    val_dataset = TensorDataset(X_val, y_val)
+    val_loader = DataLoader(
+        val_dataset, batch_size=batch_size, pin_memory=True, num_workers=10, persistent_workers=True
+    )
+
+    input_dim = 79
+    model = TabularNN(input_dim, dropout_rate=dropout_rate, activation_func=activation_func)
+    model.to(device)
+
+    # Loss and optimizer
+    criterion = nn.BCELoss()
+    optimizer = get_optimizer(model.parameters(), space)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="min", factor=factor, patience=scheduler_patience, verbose=True
+    )
+
+    # Early stopping parameters
+    patience = 15  # number of epochs to wait for improvement before terminating
+    best_val_loss = float("inf")
+    epochs_no_improve = 0
+    epochs = 1000
+
+    # Training loop
+    for epoch in range(epochs):
+        model.train()
+        running_loss = 0.0
+        for batch_data, batch_labels in train_loader:
+            batch_data, batch_labels = batch_data.to(device), batch_labels.to(device)
+            optimizer.zero_grad()
+
+            outputs = model(batch_data)
+            loss = criterion(outputs, batch_labels)
+
+            loss.backward()
+            optimizer.step()
+
+            running_loss += loss.item()
+
+        print(f"Epoch [{epoch+1}], Training Loss: {running_loss/len(train_loader):.4f}")
+
+        # Validation loop
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for batch_data, batch_labels in val_loader:
+                batch_data, batch_labels = batch_data.to(device), batch_labels.to(device)
+
+                outputs = model(batch_data)
+                loss = criterion(outputs, batch_labels)
+                val_loss += loss.item()
+
+        print(f"Epoch [{epoch+1}], Validation Loss: {val_loss/len(val_loader):.4f}")
+
+        # Step the Scheduler
+        scheduler.step(val_loss)
+
+        # Check if the validation loss improved
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            best_model_weights = model.state_dict().copy()
+            epochs_no_improve = 0  # Reset the Counter
+        else:
+            epochs_no_improve += 1
+
+        if epochs_no_improve == patience:
+            print("Early Stopping!")
+            break
+
+    model.load_state_dict(best_model_weights)
+    with torch.no_grad():
+        model.eval()
+        X_test = X_test.to(device)
+        y_test = y_test.to(device)
+        test_predictions = model(X_test)
+        test_accuracy = compute_accuracy(test_predictions, y_test)
+
+    print(f"Test Accuracy - {test_accuracy:.4f}")
+    return {"loss": -test_accuracy, "status": STATUS_OK}
+
+
+def tune_nn_parameters(X, y, X_val, y_val, X_test, y_test, device):
+    space = {
+        "batch_size": hp.choice("batch_size", [16, 32, 64, 128, 256]),
+        "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-1)),
+        "dropout": hp.uniform("dropout", 0, 0.8),
+        "weight_decay": hp.choice("weight_decay", [1e-5, 1e-4, 1e-3, 1e-2, 1e-1]),
+        # Scheduler Parameters
+        "factor": hp.uniform("factor", 0.05, 0.6),
+        "patience": hp.choice("patience", [3, 5, 7, 10, 12]),
+        # Activation Function Selection
+        "activation": hp.choice("activation", ["relu", "leaky_relu", "elu", "swish", "sigmoid", "tanh"]),
+        # Optimizer Selection and Related Parameter Selection
+        "optimizer": hp.choice(
+            "optimizer",
+            [
+                {
+                    "type": "adam",
+                    "beta1": hp.uniform("adam_beta1", 0.85, 0.999),  # Typically close to 1
+                    "beta2": hp.uniform("adam_beta2", 0.9, 0.9999),  # Typically close to 1
+                    "eps": hp.loguniform(
+                        "adam_eps", -10, -6
+                    ),  # A very small number to prevent any division by zero in the implementation
+                },
+                {
+                    "type": "rmsprop",
+                    "alpha": hp.uniform("rmsprop_alpha", 0.9, 0.9999),  # Moving average of squared gradient
+                    "eps": hp.loguniform("rmsprop_eps", -10, -6),  # A small stabilizing term
+                },
+                {
+                    "type": "sgd",
+                    "momentum": hp.uniform("sgd_momentum", 0.5, 0.99),  # Momentum term
+                    "nesterov": hp.choice("sgd_nesterov", [True, False]),  # Whether to use Nesterov acceleration
+                },
+                {
+                    "type": "nadam",
+                    "beta1": hp.uniform("nadam_beta1", 0.85, 0.999),  # Typically close to 1
+                    "beta2": hp.uniform("nadam_beta2", 0.9, 0.9999),  # Typically close to 1
+                    "eps": hp.loguniform(
+                        "nadam_eps", -10, -6
+                    ),  # A very small number to prevent any division by zero in the implementation
+                },
+                {
+                    "type": "radam",
+                    "beta1": hp.uniform("radam_beta1", 0.85, 0.999),  # Typically close to 1
+                    "beta2": hp.uniform("radam_beta2", 0.9, 0.9999),  # Typically close to 1
+                    "eps": hp.loguniform("radam_eps", -10, -6),  # A very small number to prevent any division by zero
+                },
+            ],
+        ),
+    }
+
+    # Ensure the trials directory exists
+    if not os.path.exists("./trials"):
+        os.makedirs("./trials")
+
+    trials_save_file = "./trials/nn_trials.pkl"
+    # If the file exists, set trials to None so that fmin uses the trials_save_file
+    if os.path.exists(trials_save_file):
+        trials = None
+        print("Saved Trials Object Exists! Picking Up Where we Left Off!")
+    else:
+        trials = Trials()
+
+    objective = partial(
+        nn_objective, X_train=X, y_train=y, X_val=X_val, y_val=y_val, X_test=X_test, y_test=y_test, device=device
+    )
+    fmin(
+        fn=objective,
+        space=space,
+        algo=tpe.suggest,
+        rstate=np.random.default_rng(93),
+        max_evals=300,
+        trials=trials,
+        trials_save_file=trials_save_file,
+    )
+
+    best_params = space_eval(space, trials.argmin)
+    save_hyperparameters("nn", best_params)
+
+    return best_params
+
+
+def get_optimizer(params, optimization_config):
+    learning_rate = optimization_config["learning_rate"]
+    weight_decay = optimization_config["weight_decay"]
+
+    optimizer_type = optimization_config["optimizer"]["type"]
+
+    if optimizer_type == "adam":
+        return torch.optim.Adam(
+            params,
+            lr=learning_rate,
+            betas=(optimization_config["optimizer"]["beta1"], optimization_config["optimizer"]["beta2"]),
+            eps=optimization_config["optimizer"]["eps"],
+            weight_decay=weight_decay,
+        )
+
+    elif optimizer_type == "rmsprop":
+        return torch.optim.RMSprop(
+            params,
+            lr=learning_rate,
+            alpha=optimization_config["optimizer"]["alpha"],
+            eps=optimization_config["optimizer"]["eps"],
+            weight_decay=weight_decay,
+        )
+
+    elif optimizer_type == "sgd":
+        return torch.optim.SGD(
+            params,
+            lr=learning_rate,
+            momentum=optimization_config["optimizer"]["momentum"],
+            nesterov=optimization_config["optimizer"]["nesterov"],
+            weight_decay=weight_decay,
+        )
+
+    elif optimizer_type == "nadam":
+        return torch.optim.NAdam(
+            params,
+            lr=learning_rate,
+            betas=(optimization_config["optimizer"]["beta1"], optimization_config["optimizer"]["beta2"]),
+            eps=optimization_config["optimizer"]["eps"],
+            weight_decay=weight_decay,
+        )
+
+    elif optimizer_type == "radam":
+        return torch.optim.RAdam(
+            params,
+            lr=learning_rate,
+            betas=(optimization_config["optimizer"]["beta1"], optimization_config["optimizer"]["beta2"]),
+            eps=optimization_config["optimizer"]["eps"],
+            weight_decay=weight_decay,
+        )
+
+    else:
+        raise ValueError(f"Optimizer {optimizer_type} not recognized.")
+
+
+def compute_accuracy(predictions, labels):
+    # Convert sigmoid outputs to binary predictions
+    predicted_labels = (predictions > 0.5).float()
+    correct = (predicted_labels == labels).float().sum()
+    accuracy = correct / len(labels)
+    return accuracy.item()

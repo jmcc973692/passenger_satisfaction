@@ -109,7 +109,7 @@ def main(train_path, test_path, sample_submission_path, submission_dir, device):
     )
 
     # Early stopping parameters
-    patience = 15  # number of epochs to wait for improvement before terminating
+    patience = 20  # number of epochs to wait for improvement before terminating
     best_val_loss = float("inf")
     epochs_no_improve = 0
     epochs = 1000
@@ -180,10 +180,11 @@ def main(train_path, test_path, sample_submission_path, submission_dir, device):
     # Make predictions on the test set
     model.eval()
     with torch.no_grad():
-        test_x_tensor.to(device)
+        test_x_tensor = test_x_tensor.to(device)
         test_outputs = model(test_x_tensor)
         # Convert probabilities to binary labels; using 0.5 as threshold
-        y_pred_test = (test_outputs > 0.5).float().numpy().flatten()
+
+        y_pred_test = (test_outputs > 0.5).cpu().float().numpy().flatten()
 
     # Create Submission
     submission_file_name = f"nn_submission_{timestamp}.csv"

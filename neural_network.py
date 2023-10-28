@@ -151,7 +151,7 @@ def main(train_path, test_path, sample_submission_path, submission_dir, device):
         scheduler.step(val_loss)
 
         # Check if the validation loss improved
-        if best_val_loss - val_loss > 0.001:
+        if best_val_loss - val_loss > 0.0002:
             best_val_loss = val_loss
             best_model_weights = model.state_dict().copy()
             epochs_no_improve = 0  # Reset the Counter

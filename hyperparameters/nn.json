@@ -1,0 +1,14 @@
+{
+    "activation": "leaky_relu",
+    "batch_size": 16,
+    "dropout": 0.29100432643707996,
+    "factor": 0.48962919508866554,
+    "learning_rate": 0.011485827460024741,
+    "optimizer": {
+        "momentum": 0.7534436668330129,
+        "nesterov": false,
+        "type": "sgd"
+    },
+    "patience": 12,
+    "weight_decay": 0.01
+}

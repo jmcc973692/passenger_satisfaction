@@ -371,6 +371,10 @@ def tune_nn_parameters(X, y, X_val, y_val, X_test, y_test, device):
         trials_save_file=trials_save_file,
     )
 
+    with open(trials_save_file, "rb") as f:
+        trials = pickle.load(f)
+        print("Loading Trials Object from the Final Saved File!")
+
     best_params = space_eval(space, trials.argmin)
     save_hyperparameters("nn", best_params)
 

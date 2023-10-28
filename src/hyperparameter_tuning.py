@@ -302,8 +302,8 @@ def tune_nn_parameters(X, y, X_val, y_val, X_test, y_test, device):
     space = {
         "batch_size": hp.choice("batch_size", [16, 32, 64, 128, 256]),
         "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-1)),
-        "dropout": hp.uniform("dropout", 0, 0.8),
-        "weight_decay": hp.choice("weight_decay", [1e-5, 1e-4, 1e-3, 1e-2, 1e-1]),
+        "dropout": hp.uniform("dropout", 0, 0.6),
+        "weight_decay": hp.choice("weight_decay", [0.0, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]),
         # Scheduler Parameters
         "factor": hp.uniform("factor", 0.05, 0.6),
         "patience": hp.choice("patience", [3, 5, 7, 10, 12]),

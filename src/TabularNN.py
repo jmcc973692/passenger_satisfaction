@@ -2,30 +2,30 @@ import torch.nn as nn
 
 
 class TabularNN(nn.Module):
-    def __init__(self, input_dim, dropout_rate=0.3, activation_func=nn.ReLU()):
+    def __init__(self, input_dim, dropout_rate=0.3, activation_func=nn.ReLU(), use_batch_norm=True):
         super(TabularNN, self).__init__()
 
         # Define layers
         self.layer1 = nn.Linear(input_dim, 512)
-        self.bn1 = nn.BatchNorm1d(512)
+        self.bn1 = nn.BatchNorm1d(512) if use_batch_norm else None
         self.layer2 = nn.Linear(512, 512)
-        self.bn2 = nn.BatchNorm1d(512)
+        self.bn2 = nn.BatchNorm1d(512) if use_batch_norm else None
         self.layer3 = nn.Linear(512, 256)
-        self.bn3 = nn.BatchNorm1d(256)
+        self.bn3 = nn.BatchNorm1d(256) if use_batch_norm else None
         self.layer4 = nn.Linear(256, 256)
-        self.bn4 = nn.BatchNorm1d(256)
+        self.bn4 = nn.BatchNorm1d(256) if use_batch_norm else None
         self.layer5 = nn.Linear(256, 128)
-        self.bn5 = nn.BatchNorm1d(128)
+        self.bn5 = nn.BatchNorm1d(128) if use_batch_norm else None
         self.layer6 = nn.Linear(128, 128)
-        self.bn6 = nn.BatchNorm1d(128)
+        self.bn6 = nn.BatchNorm1d(128) if use_batch_norm else None
         self.layer7 = nn.Linear(128, 64)
-        self.bn7 = nn.BatchNorm1d(64)
+        self.bn7 = nn.BatchNorm1d(64) if use_batch_norm else None
         self.layer8 = nn.Linear(64, 64)
-        self.bn8 = nn.BatchNorm1d(64)
+        self.bn8 = nn.BatchNorm1d(64) if use_batch_norm else None
         self.layer9 = nn.Linear(64, 32)
-        self.bn9 = nn.BatchNorm1d(32)
+        self.bn9 = nn.BatchNorm1d(32) if use_batch_norm else None
         self.layer10 = nn.Linear(32, 16)
-        self.bn10 = nn.BatchNorm1d(16)
+        self.bn10 = nn.BatchNorm1d(16) if use_batch_norm else None
         self.output_layer = nn.Linear(16, 1)
 
         # Activation and dropout
@@ -62,7 +62,8 @@ class TabularNN(nn.Module):
 
         for i in range(10):
             x = layers[i](x)
-            x = bns[i](x)
+            if bns[i]:
+                x = bns[i](x)
             x = self.activation(x)  # Use the provided activation function
             x = self.dropout(x)
 

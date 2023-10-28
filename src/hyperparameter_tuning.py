@@ -208,6 +208,7 @@ def nn_objective(space, X_train, y_train, X_val, y_val, X_test, y_test, device):
         "swish": nn.SiLU(),  # SiLU (Swish) was added in PyTorch 1.7.0 as nn.SiLU()
     }
     activation_func = activation_functions[space["activation"]]
+    use_batch_norm = space["use_batch_norm"]
 
     # Create DataLoader Objects
     train_dataset = TensorDataset(X_train, y_train)
@@ -221,7 +222,9 @@ def nn_objective(space, X_train, y_train, X_val, y_val, X_test, y_test, device):
     )
 
     input_dim = 79
-    model = TabularNN(input_dim, dropout_rate=dropout_rate, activation_func=activation_func)
+    model = TabularNN(
+        input_dim, dropout_rate=dropout_rate, activation_func=activation_func, use_batch_norm=use_batch_norm
+    )
     model.to(device)
 
     # Loss and optimizer
@@ -306,6 +309,8 @@ def tune_nn_parameters(X, y, X_val, y_val, X_test, y_test, device):
         "patience": hp.choice("patience", [3, 5, 7, 10, 12]),
         # Activation Function Selection
         "activation": hp.choice("activation", ["relu", "leaky_relu", "elu", "swish", "sigmoid", "tanh"]),
+        # Batch Normalization Selection
+        "use_batch_norm": hp.choice("use_batch_norm", [False, True]),
         # Optimizer Selection and Related Parameter Selection
         "optimizer": hp.choice(
             "optimizer",

@@ -83,6 +83,7 @@ def main(train_path, test_path, sample_submission_path, submission_dir, device):
         "swish": nn.SiLU(),  # SiLU (Swish) was added in PyTorch 1.7.0 as nn.SiLU()
     }
     activation_func = activation_functions[best_params["activation"]]
+    use_batch_norm = best_params["use_batch_norm"]
 
     # Create DataLoader Objects
     train_dataset = TensorDataset(x_train, y_train)
@@ -96,7 +97,9 @@ def main(train_path, test_path, sample_submission_path, submission_dir, device):
     )
 
     input_dim = train_x.shape[1]
-    model = TabularNN(input_dim, dropout_rate=dropout_rate, activation_func=activation_func)
+    model = TabularNN(
+        input_dim, dropout_rate=dropout_rate, activation_func=activation_func, use_batch_norm=use_batch_norm
+    )
 
     # Move model to the available CUDA device
     model = model.to(device)

@@ -275,7 +275,7 @@ def nn_objective(space, X_train, y_train, X_val, y_val, X_test, y_test, device):
         scheduler.step(val_loss)
 
         # Check if the validation loss improved
-        if val_loss < best_val_loss:
+        if best_val_loss - val_loss > 0.001:
             best_val_loss = val_loss
             best_model_weights = model.state_dict().copy()
             epochs_no_improve = 0  # Reset the Counter

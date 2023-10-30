@@ -1,0 +1,16 @@
+{
+    "activation": "leaky_relu",
+    "batch_size": 32,
+    "dropout": 0.09488310638223973,
+    "factor": 0.5330212167593281,
+    "learning_rate": 0.056179730441126154,
+    "optimizer": {
+        "beta1": 0.96415595265052,
+        "beta2": 0.9678404073728796,
+        "eps": 7.642727758162672e-5,
+        "type": "adam"
+    },
+    "patience": 7,
+    "use_batch_norm": true,
+    "weight_decay": 0.01
+}

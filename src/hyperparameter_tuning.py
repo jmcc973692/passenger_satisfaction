@@ -17,6 +17,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score
 from torch.utils.data import DataLoader, TensorDataset
 
+from src.DynamicTabularNN import DynamicTabularNN
 from src.TabularNN import TabularNN
 
 
@@ -222,8 +223,13 @@ def nn_objective(space, X_train, y_train, X_val, y_val, X_test, y_test, device):
     )
 
     input_dim = 79
-    model = TabularNN(
-        input_dim, dropout_rate=dropout_rate, activation_func=activation_func, use_batch_norm=use_batch_norm
+    layers = space["layers"]
+    model = DynamicTabularNN(
+        input_dim,
+        dropout_rate=dropout_rate,
+        layers=layers,
+        activation_func=activation_func,
+        use_batch_norm=use_batch_norm,
     )
     model.to(device)
 
@@ -294,15 +300,33 @@ def nn_objective(space, X_train, y_train, X_val, y_val, X_test, y_test, device):
         test_predictions = model(X_test)
         test_accuracy = compute_accuracy(test_predictions, y_test)
 
+    # Save the results to a file after each trial
+    save_results_to_file(space, test_accuracy, "./output/trials_results.txt")
+
     print(f"Test Accuracy - {test_accuracy:.4f}")
     return {"loss": -test_accuracy, "status": STATUS_OK}
 
 
 def tune_nn_parameters(X, y, X_val, y_val, X_test, y_test, device):
     space = {
-        "batch_size": hp.choice("batch_size", [16, 32, 64, 128, 256]),
+        "batch_size": hp.choice("batch_size", [64, 128, 256]),
         "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-1)),
         "dropout": hp.uniform("dropout", 0, 0.6),
+        "layers": hp.choice(
+            "layers",
+            [
+                [256, 256, 256],
+                [384, 384, 384],
+                [512, 512, 512],
+                [512, 384, 256],
+                [448, 320, 192],
+                [384, 256, 128],
+                [512, 448, 384],
+                [256, 384, 512],
+                [192, 384, 192],
+                [384, 192, 384],
+            ],
+        ),
         "weight_decay": hp.choice("weight_decay", [0.0, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]),
         # Scheduler Parameters
         "factor": hp.uniform("factor", 0.05, 0.6),
@@ -370,8 +394,8 @@ def tune_nn_parameters(X, y, X_val, y_val, X_test, y_test, device):
         fn=objective,
         space=space,
         algo=tpe.suggest,
-        rstate=np.random.default_rng(93),
-        max_evals=300,
+        rstate=np.random.default_rng(105),
+        max_evals=500,
         trials=trials,
         trials_save_file=trials_save_file,
     )
@@ -447,3 +471,12 @@ def compute_accuracy(predictions, labels):
     correct = (predicted_labels == labels).float().sum()
     accuracy = correct / len(labels)
     return accuracy.item()
+
+
+def save_results_to_file(params, accuracy, filename):
+    with open(filename, "a") as file:
+        file.write("Parameters:\n")
+        for key, value in params.items():
+            file.write(f"{key}: {value}\n")
+        file.write(f"Accuracy: {accuracy:.4f}\n")
+        file.write("-" * 40 + "\n")

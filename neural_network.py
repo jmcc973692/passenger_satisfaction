@@ -9,6 +9,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR, CosineAnnealingWarmResta
 from torch.utils.data import DataLoader, TensorDataset
 
 from src.data_handling import prepare_data
+from src.DynamicTabularNN import DynamicTabularNN
 from src.feature_engineering import perform_feature_engineering_nn
 from src.hyperparameter_tuning import get_optimizer, tune_nn_parameters
 from src.submission import load_sample_submission, save_submission, update_submission_structure
@@ -61,12 +62,12 @@ def main(train_path, test_path, sample_submission_path, submission_dir, device):
 
     # First, split into (training + validation) and test sets
     x_trainval, x_test, y_trainval, y_test = train_test_split(
-        train_x_tensor, train_y_tensor, test_size=0.15, random_state=42
+        train_x_tensor, train_y_tensor, test_size=0.15, random_state=10
     )
 
     # Now, split the training + validation set into training and validation sets
     # 0.1765 of 0.85 is roughly 0.1
-    x_train, x_val, y_train, y_val = train_test_split(x_trainval, y_trainval, test_size=0.1765, random_state=42)
+    x_train, x_val, y_train, y_val = train_test_split(x_trainval, y_trainval, test_size=0.1765, random_state=10)
 
     best_params = get_hyperparameters(x_train, y_train, x_val, y_val, x_test, y_test, device)
     # Unpack the Best Parameters
@@ -85,6 +86,13 @@ def main(train_path, test_path, sample_submission_path, submission_dir, device):
     activation_func = activation_functions[best_params["activation"]]
     use_batch_norm = best_params["use_batch_norm"]
 
+    # For the final model training - Use a 85 -15 Train to Validation Split
+    # After hyperparameter optimization, combine training and test sets and then create an 85-15 split for train-validation
+    x_combined = torch.cat([x_trainval, x_test], axis=0)
+    y_combined = torch.cat([y_trainval, y_test], axis=0)
+
+    x_train, x_val, y_train, y_val = train_test_split(x_combined, y_combined, test_size=0.15, random_state=10)
+
     # Create DataLoader Objects
     train_dataset = TensorDataset(x_train, y_train)
     train_loader = DataLoader(
@@ -97,8 +105,13 @@ def main(train_path, test_path, sample_submission_path, submission_dir, device):
     )
 
     input_dim = train_x.shape[1]
-    model = TabularNN(
-        input_dim, dropout_rate=dropout_rate, activation_func=activation_func, use_batch_norm=use_batch_norm
+    layers = best_params["layers"]
+    model = DynamicTabularNN(
+        input_dim,
+        dropout_rate=dropout_rate,
+        layers=layers,
+        activation_func=activation_func,
+        use_batch_norm=use_batch_norm,
     )
 
     # Move model to the available CUDA device
@@ -165,12 +178,21 @@ def main(train_path, test_path, sample_submission_path, submission_dir, device):
     model.load_state_dict(best_model_weights)
     with torch.no_grad():
         model.eval()
-        x_test = x_test.to(device)
-        y_test = y_test.to(device)
+        x_val = x_val.to(device)
+        y_val = y_val.to(device)
 
-        test_predictions = model(x_test)
-        test_accuracy = compute_accuracy(test_predictions, y_test)
-        print(f"Final Test Set Accuracy: {test_accuracy:.4f}")
+        val_predictions = model(x_val)
+        val_accuracy = compute_accuracy(val_predictions, y_val)
+        print(f"Final Validation Set Accuracy: {val_accuracy:.4f}")
+
+    with torch.no_grad():
+        model.eval()
+        x_train = x_train.to(device)
+        y_train = y_train.to(device)
+
+        train_predictions = model(x_train)
+        train_accuracy = compute_accuracy(train_predictions, y_train)
+        print(f"Final Training Set Accuracy: {train_accuracy:.4f}")
 
     # Save model
     timestamp = datetime.now().strftime("%m_%d_%Y_%H-%M")
@@ -210,5 +232,9 @@ if __name__ == "__main__":
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using Device: {device}")
+
+    # Make Sure the ./output directory exists because things will be saved there
+    if not os.path.exists("./output"):
+        os.makedirs("./output")
 
     main(train_path, test_path, sample_submission_path, submission_dir, device)

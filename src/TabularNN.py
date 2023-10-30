@@ -6,27 +6,19 @@ class TabularNN(nn.Module):
         super(TabularNN, self).__init__()
 
         # Define layers
-        self.layer1 = nn.Linear(input_dim, 512)
-        self.bn1 = nn.BatchNorm1d(512) if use_batch_norm else None
-        self.layer2 = nn.Linear(512, 512)
-        self.bn2 = nn.BatchNorm1d(512) if use_batch_norm else None
-        self.layer3 = nn.Linear(512, 256)
-        self.bn3 = nn.BatchNorm1d(256) if use_batch_norm else None
-        self.layer4 = nn.Linear(256, 256)
-        self.bn4 = nn.BatchNorm1d(256) if use_batch_norm else None
-        self.layer5 = nn.Linear(256, 128)
-        self.bn5 = nn.BatchNorm1d(128) if use_batch_norm else None
-        self.layer6 = nn.Linear(128, 128)
-        self.bn6 = nn.BatchNorm1d(128) if use_batch_norm else None
-        self.layer7 = nn.Linear(128, 64)
-        self.bn7 = nn.BatchNorm1d(64) if use_batch_norm else None
-        self.layer8 = nn.Linear(64, 64)
-        self.bn8 = nn.BatchNorm1d(64) if use_batch_norm else None
-        self.layer9 = nn.Linear(64, 32)
-        self.bn9 = nn.BatchNorm1d(32) if use_batch_norm else None
-        self.layer10 = nn.Linear(32, 16)
-        self.bn10 = nn.BatchNorm1d(16) if use_batch_norm else None
-        self.output_layer = nn.Linear(16, 1)
+        self.layer1 = nn.Linear(input_dim, 256)
+        self.bn1 = nn.BatchNorm1d(256) if use_batch_norm else None
+        self.layer2 = nn.Linear(256, 128)
+        self.bn2 = nn.BatchNorm1d(128) if use_batch_norm else None
+        self.layer3 = nn.Linear(128, 64)
+        self.bn3 = nn.BatchNorm1d(64) if use_batch_norm else None
+        self.layer4 = nn.Linear(64, 32)
+        self.bn4 = nn.BatchNorm1d(32) if use_batch_norm else None
+        self.layer5 = nn.Linear(32, 16)
+        self.bn5 = nn.BatchNorm1d(16) if use_batch_norm else None
+        self.layer6 = nn.Linear(16, 8)
+        self.bn6 = nn.BatchNorm1d(8) if use_batch_norm else None
+        self.output_layer = nn.Linear(8, 1)
 
         # Activation and dropout
         self.activation = activation_func  # Set activation function
@@ -41,10 +33,6 @@ class TabularNN(nn.Module):
             self.layer4,
             self.layer5,
             self.layer6,
-            self.layer7,
-            self.layer8,
-            self.layer9,
-            self.layer10,
         ]
 
         bns = [
@@ -54,13 +42,9 @@ class TabularNN(nn.Module):
             self.bn4,
             self.bn5,
             self.bn6,
-            self.bn7,
-            self.bn8,
-            self.bn9,
-            self.bn10,
         ]
 
-        for i in range(10):
+        for i in range(6):
             x = layers[i](x)
             if bns[i]:
                 x = bns[i](x)

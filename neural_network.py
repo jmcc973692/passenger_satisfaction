@@ -62,12 +62,12 @@ def main(train_path, test_path, sample_submission_path, submission_dir, device):
 
     # First, split into (training + validation) and test sets
     x_trainval, x_test, y_trainval, y_test = train_test_split(
-        train_x_tensor, train_y_tensor, test_size=0.15, random_state=10
+        train_x_tensor, train_y_tensor, test_size=0.15, random_state=42
     )
 
     # Now, split the training + validation set into training and validation sets
     # 0.1765 of 0.85 is roughly 0.1
-    x_train, x_val, y_train, y_val = train_test_split(x_trainval, y_trainval, test_size=0.1765, random_state=10)
+    x_train, x_val, y_train, y_val = train_test_split(x_trainval, y_trainval, test_size=0.1765, random_state=42)
 
     best_params = get_hyperparameters(x_train, y_train, x_val, y_val, x_test, y_test, device)
     # Unpack the Best Parameters
@@ -91,7 +91,7 @@ def main(train_path, test_path, sample_submission_path, submission_dir, device):
     x_combined = torch.cat([x_trainval, x_test], axis=0)
     y_combined = torch.cat([y_trainval, y_test], axis=0)
 
-    x_train, x_val, y_train, y_val = train_test_split(x_combined, y_combined, test_size=0.15, random_state=10)
+    x_train, x_val, y_train, y_val = train_test_split(x_combined, y_combined, test_size=0.15, random_state=42)
 
     # Create DataLoader Objects
     train_dataset = TensorDataset(x_train, y_train)

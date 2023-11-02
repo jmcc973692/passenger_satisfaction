@@ -14,7 +14,7 @@ if __name__ == "__main__":
     test_path = "./input/test.csv"
     sample_submission_path = "./input/sample_submission.csv"
     submission_dir = "./submission"
-
+    device = torch.device("cpu")
     train_df, test_df = prepare_data(train_path=train_path, test_path=test_path)
 
     test_df_lgbm = perform_feature_engineering_nn(test_df.copy())
@@ -31,7 +31,7 @@ if __name__ == "__main__":
         lgbm_model = joblib.load(f)
 
     # Load Neural Network model (assuming it's saved as a PyTorch model)
-    nn_model = torch.load("./models/nn_model.pt")
+    nn_model = torch.load("./models/nn_model.pt").to(device)
     nn_model.eval()  # Set the neural network to evaluation mode
 
     # Predictions for LGBM
@@ -42,10 +42,10 @@ if __name__ == "__main__":
         nn_output = nn_model(test_x_tensor)
         nn_predictions = torch.sigmoid(nn_output).numpy().squeeze()
 
-    alpha = 0.6
+    alpha = 0.5
     weighted_predictions = alpha * lgbm_predictions + (1 - alpha) * nn_predictions
 
-    binary_avg_predictions = (weighted_predictions > 0.55).astype(int)
+    binary_avg_predictions = (weighted_predictions > 0.50).astype(int)
 
     sample_submission_df = load_sample_submission(sample_submission_path=sample_submission_path)
     update_submission_structure(sample_submission_df, binary_avg_predictions)

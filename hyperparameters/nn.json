@@ -1,0 +1,17 @@
+{
+    "activation": "sigmoid",
+    "batch_size": 64,
+    "dropout": 0.4,
+    "factor": 0.45660016163962847,
+    "layers": [256, 128, 64],
+    "learning_rate": 0.0017971977046620897,
+    "optimizer": {
+        "beta1": 0.9812303956942384,
+        "beta2": 0.9685557859878696,
+        "eps": 9.8043775861605e-5,
+        "type": "adam"
+    },
+    "patience": 5,
+    "use_batch_norm": true,
+    "weight_decay": 0.0
+}

@@ -146,36 +146,44 @@ def lgbm_objective(space, X, y):
         num_leaves=int(space["num_leaves"]),
         min_child_samples=int(space["min_child_samples"]),
         subsample=space["subsample"],
-        bagging_freq=space["bagging_freq"],
+        bagging_freq=int(space["bagging_freq"]),
         colsample_bytree=space["colsample_bytree"],
         reg_alpha=space["reg_alpha"],
         reg_lambda=space["reg_lambda"],
+        min_split_gain=space["min_split_gain"],
+        min_child_weight=space["min_child_weight"],
+        subsample_freq=int(space["subsample_freq"]),
+        max_bin=int(space["max_bin"]),
+        verbose=-1,
     )
-    accuracy = cross_val_score(model, X, y, cv=5, n_jobs=-1).mean()
+    accuracy = cross_val_score(model, X, y, cv=10, n_jobs=-1).mean()
     return {"loss": -accuracy, "status": STATUS_OK}
 
 
-def tune_lgbm_parameters(X, y, max_evals=500):
+def tune_lgbm_parameters(X, y, max_evals=600):
     space = {
         "n_estimators": hp.choice("n_estimators", range(800, 1100, 10)),
         "learning_rate": hp.loguniform("learning_rate", np.log(0.005), np.log(0.02)),
-        "max_depth": hp.choice("max_depth", range(18, 25)),
-        "num_leaves": hp.choice("num_leaves", range(80, 140)),
-        "min_child_samples": hp.choice("min_child_samples", range(5, 12)),
-        "subsample": hp.uniform("subsample", 0.75, 0.85),
-        "bagging_freq": hp.choice("bagging_freq", [0, 1, 2, 3, 4]),
-        "colsample_bytree": hp.uniform("colsample_bytree", 0.65, 0.75),
-        "reg_alpha": hp.loguniform("reg_alpha", np.log(0.00005), np.log(0.0005)),
-        "reg_lambda": hp.loguniform("reg_lambda", np.log(0.05), np.log(0.08)),
+        "max_depth": hp.choice("max_depth", range(5, 25)),
+        "num_leaves": hp.choice("num_leaves", range(30, 150)),
+        "min_child_samples": hp.choice("min_child_samples", range(20, 100)),
+        "subsample": hp.uniform("subsample", 0.5, 0.9),
+        "bagging_freq": hp.choice("bagging_freq", list(range(0, 10))),
+        "colsample_bytree": hp.uniform("colsample_bytree", 0.5, 0.8),
+        "reg_alpha": hp.choice("reg_alpha", [0] + [np.exp(x) for x in np.linspace(np.log(0.00001), np.log(1), 100)]),
+        "reg_lambda": hp.choice("reg_lambda", [0] + [np.exp(x) for x in np.linspace(np.log(0.00001), np.log(1), 100)]),
+        "min_split_gain": hp.loguniform("min_split_gain", np.log(0.0001), np.log(0.1)),
+        "min_child_weight": hp.loguniform("min_child_weight", np.log(0.001), np.log(0.1)),
+        "subsample_freq": hp.choice("subsample_freq", range(0, 10)),
+        "max_bin": hp.quniform("max_bin", 200, 300, 5),
     }
-
     trials = Trials()
     objective = partial(lgbm_objective, X=X, y=y)
     fmin(
         fn=objective,
         space=space,
         algo=rand.suggest,
-        rstate=np.random.default_rng(4389210),
+        rstate=np.random.default_rng(2384719),
         max_evals=125,
         trials=trials,
     )
@@ -183,7 +191,7 @@ def tune_lgbm_parameters(X, y, max_evals=500):
         fn=objective,
         space=space,
         algo=tpe.suggest,
-        rstate=np.random.default_rng(5543),
+        rstate=np.random.default_rng(42631),
         max_evals=max_evals,
         trials=trials,
     )

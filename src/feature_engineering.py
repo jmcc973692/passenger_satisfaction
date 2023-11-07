@@ -277,6 +277,22 @@ def perform_feature_engineering(df):
     return df
 
 
+def perform_feature_engineering_lgbm(df):
+    # Separate the Data into Data Types
+    # numerical_columns = ["Age", "Flight_Distance", "Departure_Delay_in_Minutes", "Arrival_Delay_in_Minutes"]
+    categorical_columns = ["Gender", "Customer_Type", "Type_of_Travel", "Class"]
+
+    df = pd.get_dummies(df, columns=categorical_columns, drop_first=True, dtype=int)
+    # for feature in categorical_columns:
+    #     df[feature] = df[feature].astype("category")
+    df = one_hot_encode_survey_features(df)
+    df.columns = df.columns.str.replace(" ", "_")
+
+    # df = scale_numerical_features(df, numerical_columns)
+
+    return df
+
+
 def perform_feature_engineering_nn(df):
     # Separate the Data into Data Types
     numerical_columns = ["Age", "Flight_Distance", "Departure_Delay_in_Minutes", "Arrival_Delay_in_Minutes"]

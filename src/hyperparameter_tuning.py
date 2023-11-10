@@ -54,35 +54,21 @@ def xgb_objective(space):
         grow_policy=space["grow_policy"],
     )
 
-    accuracy = cross_val_score(
-        model, space["X"], space["y"], cv=5, scoring="accuracy"
-    ).mean()
+    accuracy = cross_val_score(model, space["X"], space["y"], cv=5, scoring="accuracy").mean()
     return {"loss": -accuracy, "status": STATUS_OK}
 
 
 def tune_xgb_parameters(X, y, max_evals=200):  # Increased max_evals
     space = {
-        "learning_rate": hp.loguniform(
-            "learning_rate", -5, 0
-        ),  # A log uniform from ~0.007 to 1 might be sensible
-        "min_child_weight": hp.quniform(
-            "min_child_weight", 1, 10, 1
-        ),  # You can adjust the range based on dataset size
-        "max_depth": hp.choice(
-            "max_depth", list(range(3, 15))
-        ),  # Common choice for depth
+        "learning_rate": hp.loguniform("learning_rate", -5, 0),  # A log uniform from ~0.007 to 1 might be sensible
+        "min_child_weight": hp.quniform("min_child_weight", 1, 10, 1),  # You can adjust the range based on dataset size
+        "max_depth": hp.choice("max_depth", list(range(3, 15))),  # Common choice for depth
         "gamma": hp.quniform("gamma", 0, 0.5, 0.01),  # A range of 0 to 0.5 by 0.01
-        "subsample": hp.quniform(
-            "subsample", 0.5, 1, 0.05
-        ),  # Values from 0.5 to 1 with a step of 0.05
-        "colsample_bytree": hp.quniform(
-            "colsample_bytree", 0.5, 1, 0.05
-        ),  # Similar to above
+        "subsample": hp.quniform("subsample", 0.5, 1, 0.05),  # Values from 0.5 to 1 with a step of 0.05
+        "colsample_bytree": hp.quniform("colsample_bytree", 0.5, 1, 0.05),  # Similar to above
         "colsample_bylevel": hp.quniform("colsample_bylevel", 0.5, 1, 0.05),
         "colsample_bynode": hp.quniform("colsample_bynode", 0.5, 1, 0.05),
-        "reg_lambda": hp.loguniform(
-            "reg_lambda", -5, 2
-        ),  # Log uniform for regularization
+        "reg_lambda": hp.loguniform("reg_lambda", -5, 2),  # Log uniform for regularization
         "reg_alpha": hp.loguniform("reg_alpha", -5, 2),
         "scale_pos_weight": hp.loguniform(
             "scale_pos_weight", 0, 2
@@ -155,16 +141,10 @@ def tune_rf_parameters(X, y, max_evals=100):
         trials=trials,
     )
 
-    best_params["n_estimators"] = [i for i in range(50, 500, 50)][
-        best_params["n_estimators"]
-    ]
+    best_params["n_estimators"] = [i for i in range(50, 500, 50)][best_params["n_estimators"]]
     best_params["max_depth"] = list(range(3, 15))[best_params["max_depth"]]
-    best_params["min_samples_split"] = list(range(2, 20))[
-        best_params["min_samples_split"]
-    ]
-    best_params["min_samples_leaf"] = list(range(1, 10))[
-        best_params["min_samples_leaf"]
-    ]
+    best_params["min_samples_split"] = list(range(2, 20))[best_params["min_samples_split"]]
+    best_params["min_samples_leaf"] = list(range(1, 10))[best_params["min_samples_leaf"]]
     best_params["max_features"] = ["auto", "sqrt", "log2"][best_params["max_features"]]
     save_hyperparameters("rf", best_params)
     return best_params
@@ -198,9 +178,7 @@ def tune_lgbm_parameters(X, y, max_evals=750):
         "max_bin": hp.quniform("max_bin", 180, 300, 1),
         "max_depth": hp.quniform("max_depth", 10, 30, 1),
         "min_child_samples": hp.quniform("min_child_samples", 5, 50, 1),
-        "min_child_weight": hp.loguniform(
-            "min_child_weight", np.log(0.0001), np.log(0.01)
-        ),
+        "min_child_weight": hp.loguniform("min_child_weight", np.log(0.0001), np.log(0.01)),
         "min_split_gain": hp.loguniform("min_split_gain", np.log(0.0001), np.log(0.01)),
         "n_estimators": hp.quniform("n_estimators", 800, 1500, 1),
         "num_leaves": hp.quniform("num_leaves", 80, 200, 1),
@@ -325,9 +303,7 @@ def nn_objective(space, X_train, y_train, X_val, y_val, X_test, y_test, device):
         val_loss = 0.0
         with torch.no_grad():
             for batch_data, batch_labels in val_loader:
-                batch_data, batch_labels = batch_data.to(device), batch_labels.to(
-                    device
-                )
+                batch_data, batch_labels = batch_data.to(device), batch_labels.to(device)
 
                 outputs = model(batch_data)
                 loss = criterion(outputs, batch_labels)
@@ -410,9 +386,7 @@ def tune_nn_parameters(X, y, X_val, y_val, X_test, y_test, device):
         "factor": hp.uniform("factor", 0.05, 0.6),
         "patience": hp.choice("patience", [3, 5, 7, 10, 12]),
         # Activation Function Selection
-        "activation": hp.choice(
-            "activation", ["relu", "leaky_relu", "elu", "swish", "sigmoid", "tanh"]
-        ),
+        "activation": hp.choice("activation", ["relu", "leaky_relu", "elu", "swish", "sigmoid", "tanh"]),
         # Batch Normalization Selection
         "use_batch_norm": hp.choice("use_batch_norm", [False, True]),
         # Optimizer Selection and Related Parameter Selection
@@ -421,55 +395,35 @@ def tune_nn_parameters(X, y, X_val, y_val, X_test, y_test, device):
             [
                 {
                     "type": "adam",
-                    "beta1": hp.uniform(
-                        "adam_beta1", 0.85, 0.999
-                    ),  # Typically close to 1
-                    "beta2": hp.uniform(
-                        "adam_beta2", 0.9, 0.9999
-                    ),  # Typically close to 1
+                    "beta1": hp.uniform("adam_beta1", 0.85, 0.999),  # Typically close to 1
+                    "beta2": hp.uniform("adam_beta2", 0.9, 0.9999),  # Typically close to 1
                     "eps": hp.loguniform(
                         "adam_eps", -10, -6
                     ),  # A very small number to prevent any division by zero in the implementation
                 },
                 {
                     "type": "rmsprop",
-                    "alpha": hp.uniform(
-                        "rmsprop_alpha", 0.9, 0.9999
-                    ),  # Moving average of squared gradient
-                    "eps": hp.loguniform(
-                        "rmsprop_eps", -10, -6
-                    ),  # A small stabilizing term
+                    "alpha": hp.uniform("rmsprop_alpha", 0.9, 0.9999),  # Moving average of squared gradient
+                    "eps": hp.loguniform("rmsprop_eps", -10, -6),  # A small stabilizing term
                 },
                 {
                     "type": "sgd",
                     "momentum": hp.uniform("sgd_momentum", 0.5, 0.99),  # Momentum term
-                    "nesterov": hp.choice(
-                        "sgd_nesterov", [True, False]
-                    ),  # Whether to use Nesterov acceleration
+                    "nesterov": hp.choice("sgd_nesterov", [True, False]),  # Whether to use Nesterov acceleration
                 },
                 {
                     "type": "nadam",
-                    "beta1": hp.uniform(
-                        "nadam_beta1", 0.85, 0.999
-                    ),  # Typically close to 1
-                    "beta2": hp.uniform(
-                        "nadam_beta2", 0.9, 0.9999
-                    ),  # Typically close to 1
+                    "beta1": hp.uniform("nadam_beta1", 0.85, 0.999),  # Typically close to 1
+                    "beta2": hp.uniform("nadam_beta2", 0.9, 0.9999),  # Typically close to 1
                     "eps": hp.loguniform(
                         "nadam_eps", -10, -6
                     ),  # A very small number to prevent any division by zero in the implementation
                 },
                 {
                     "type": "radam",
-                    "beta1": hp.uniform(
-                        "radam_beta1", 0.85, 0.999
-                    ),  # Typically close to 1
-                    "beta2": hp.uniform(
-                        "radam_beta2", 0.9, 0.9999
-                    ),  # Typically close to 1
-                    "eps": hp.loguniform(
-                        "radam_eps", -10, -6
-                    ),  # A very small number to prevent any division by zero
+                    "beta1": hp.uniform("radam_beta1", 0.85, 0.999),  # Typically close to 1
+                    "beta2": hp.uniform("radam_beta2", 0.9, 0.9999),  # Typically close to 1
+                    "eps": hp.loguniform("radam_eps", -10, -6),  # A very small number to prevent any division by zero
                 },
             ],
         ),

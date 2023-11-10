@@ -15,10 +15,18 @@ from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test
 
 from src.data_handling import prepare_data
 from src.error_analysis import error_analysis
-from src.feature_engineering import perform_feature_engineering_nn
+from src.feature_engineering import perform_feature_engineering_lgbm
 from src.feature_selection import keep_best_features_only
-from src.hyperparameter_tuning import tune_lgbm_parameters, tune_rf_parameters, tune_xgb_parameters
-from src.submission import load_sample_submission, save_submission, update_submission_structure
+from src.hyperparameter_tuning import (
+    tune_lgbm_parameters,
+    tune_rf_parameters,
+    tune_xgb_parameters,
+)
+from src.submission import (
+    load_sample_submission,
+    save_submission,
+    update_submission_structure,
+)
 
 
 def get_hyperparameters(algorithm, train_x, train_y):
@@ -45,8 +53,8 @@ def main(train_path, test_path, sample_submission_path, submission_dir, algorith
     train_df, test_df = prepare_data(train_path, test_path)
 
     # Feature Engineering Steps
-    train_df = perform_feature_engineering_nn(train_df)
-    test_df = perform_feature_engineering_nn(test_df)
+    train_df = perform_feature_engineering_lgbm(train_df)
+    test_df = perform_feature_engineering_lgbm(test_df)
 
     # Uncomment to output a new full feature set csv file including all of the feature engineering
     # train_df.to_csv("./output/train_full_feature_set.csv", index=False)
@@ -77,7 +85,9 @@ def main(train_path, test_path, sample_submission_path, submission_dir, algorith
     model.fit(train_x, train_y)
 
     # Evaluate Average Cross-Validated accuracy
-    scores = cross_val_score(model, train_x, train_y, cv=5, n_jobs=-1, scoring="accuracy")
+    scores = cross_val_score(
+        model, train_x, train_y, cv=5, n_jobs=-1, scoring="accuracy"
+    )
     print(f"Cross-Validation Accuracy Scores: {scores}")
     # Calculate and print the average accuracy over all folds
     avg_accuracy = np.mean(scores)
@@ -88,9 +98,9 @@ def main(train_path, test_path, sample_submission_path, submission_dir, algorith
     print(f"Accuracy on training data: {accuracy:.4f}")
 
     # Output model importances
-    importance_df = pd.DataFrame({"Feature": train_x.columns, "Importance": model.feature_importances_}).sort_values(
-        by="Importance", ascending=False
-    )
+    importance_df = pd.DataFrame(
+        {"Feature": train_x.columns, "Importance": model.feature_importances_}
+    ).sort_values(by="Importance", ascending=False)
 
     importance_df.to_csv("./output/feature-importance.txt", index=False, sep="\t")
 

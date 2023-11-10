@@ -32,11 +32,11 @@ def threshold_objective(threshold, X, y, model):
 
 
 def find_optimal_threshold(X, y, model):
-    space = hp.uniform("threshold", 0.25, 0.75)
+    space = hp.uniform("threshold", 0.3, 0.7)
 
     trials = Trials()
     objective = partial(threshold_objective, X=X, y=y, model=model)
-    optimal_threshold = fmin(fn=objective, space=space, algo=tpe.suggest, max_evals=75, trials=trials)
+    optimal_threshold = fmin(fn=objective, space=space, algo=tpe.suggest, max_evals=100, trials=trials)
 
     print(f"Optimal Threshold = {optimal_threshold['threshold']}")
     return optimal_threshold["threshold"]

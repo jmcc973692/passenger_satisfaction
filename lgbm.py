@@ -9,7 +9,12 @@ import pandas as pd
 from imblearn.over_sampling import SMOTE
 from lightgbm import LGBMClassifier
 from sklearn.datasets import make_classification
-from sklearn.metrics import accuracy_score, f1_score, make_scorer, precision_recall_curve
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    make_scorer,
+    precision_recall_curve,
+)
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 
 from src.data_handling import prepare_data
@@ -18,7 +23,11 @@ from src.feature_engineering import perform_feature_engineering_lgbm
 from src.feature_selection import keep_best_features_only
 from src.hyperparameter_tuning import tune_lgbm_parameters
 from src.optimal_threshold import find_optimal_threshold, threshold_scorer
-from src.submission import load_sample_submission, save_submission, update_submission_structure
+from src.submission import (
+    load_sample_submission,
+    save_submission,
+    update_submission_structure,
+)
 
 
 def get_hyperparameters(train_x, train_y):
@@ -90,34 +99,59 @@ if __name__ == "__main__":
 
     # Cross-Validation before applying optimal threshold
     model = train_lgbm(train_x=train_x, train_y=train_y)
-    scores_before_threshold = cross_val_score(model, train_x, train_y, cv=10, n_jobs=-1, scoring="accuracy")
-    print(f"Cross-Validation Accuracy Scores Before Threshold: {scores_before_threshold}")
-    print(f"Average cross-validated accuracy before threshold: {np.mean(scores_before_threshold):.4f}")
+    scores_before_threshold = cross_val_score(
+        model, train_x, train_y, cv=10, n_jobs=-1, scoring="accuracy"
+    )
+    print(
+        f"Cross-Validation Accuracy Scores Before Threshold: {scores_before_threshold}"
+    )
+    print(
+        f"Average cross-validated accuracy before threshold: {np.mean(scores_before_threshold):.4f}"
+    )
+
+    accuracy = (model.predict(train_x) == train_y).sum() / len(train_y)
+    print(f"Accuracy on training data: {accuracy:.4f}")
 
     # Error Analysis before applying optimal threshold
     error_analysis_results_before = error_analysis(train_x, train_y, model)
-    error_analysis_results_before.to_csv("./output/error_analysis_before_threshold.csv", index=False)
+    error_analysis_results_before.to_csv(
+        "./output/error_analysis_before_threshold.csv", index=False
+    )
 
-    # Find the optimal threshold using bayesian optimization
-    optimal_threshold = find_optimal_threshold(train_x, train_y, model)
+    # # Find the optimal threshold using bayesian optimization
+    # optimal_threshold = find_optimal_threshold(train_x, train_y, model)
     # # Or Set Optimal_threshold
-    # optimal_threshold = 0.5056973148159999
+    # optimal_threshold = 0.5098289558618329
+    optimal_threshold = 0.5
 
     scorer = threshold_scorer(optimal_threshold)
-    accuracy_scores_after_threshold = cross_val_score(model, train_x, train_y, scoring=scorer, n_jobs=-1, cv=10)
-    print(f"Cross-Validation Accuracy Scores After Threshold: {accuracy_scores_after_threshold}")
-    print(f"Average Cross-Validated Accuracy After Threshold: {np.mean(accuracy_scores_after_threshold):.4f}")
+    accuracy_scores_after_threshold = cross_val_score(
+        model, train_x, train_y, scoring=scorer, n_jobs=-1, cv=10
+    )
+    print(
+        f"Cross-Validation Accuracy Scores After Threshold: {accuracy_scores_after_threshold}"
+    )
+    print(
+        f"Average Cross-Validated Accuracy After Threshold: {np.mean(accuracy_scores_after_threshold):.4f}"
+    )
 
     y_probs = model.predict_proba(train_x)[:, 1]
     # Error Analysis after applying optimal threshold
     y_pred = (y_probs >= optimal_threshold).astype(int)
-    error_analysis_results_after = error_analysis(train_x, train_y, model, threshold=optimal_threshold)
-    error_analysis_results_after.to_csv("./output/error_analysis_after_threshold.csv", index=False)
+    accuracy_after = (y_pred == train_y).sum() / len(train_y)
+    print(f"Accuracy on training data after threshold: {accuracy_after:.4f}")
+
+    error_analysis_results_after = error_analysis(
+        train_x, train_y, model, threshold=optimal_threshold
+    )
+    error_analysis_results_after.to_csv(
+        "./output/error_analysis_after_threshold.csv", index=False
+    )
 
     # Output model importances
-    importance_df = pd.DataFrame({"Feature": train_x.columns, "Importance": model.feature_importances_}).sort_values(
-        by="Importance", ascending=False
-    )
+    importance_df = pd.DataFrame(
+        {"Feature": train_x.columns, "Importance": model.feature_importances_}
+    ).sort_values(by="Importance", ascending=False)
 
     importance_df.to_csv("./output/feature-importance.txt", index=False, sep="\t")
 

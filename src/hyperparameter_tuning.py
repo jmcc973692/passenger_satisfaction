@@ -54,21 +54,35 @@ def xgb_objective(space):
         grow_policy=space["grow_policy"],
     )
 
-    accuracy = cross_val_score(model, space["X"], space["y"], cv=5, scoring="accuracy").mean()
+    accuracy = cross_val_score(
+        model, space["X"], space["y"], cv=5, scoring="accuracy"
+    ).mean()
     return {"loss": -accuracy, "status": STATUS_OK}
 
 
 def tune_xgb_parameters(X, y, max_evals=200):  # Increased max_evals
     space = {
-        "learning_rate": hp.loguniform("learning_rate", -5, 0),  # A log uniform from ~0.007 to 1 might be sensible
-        "min_child_weight": hp.quniform("min_child_weight", 1, 10, 1),  # You can adjust the range based on dataset size
-        "max_depth": hp.choice("max_depth", list(range(3, 15))),  # Common choice for depth
+        "learning_rate": hp.loguniform(
+            "learning_rate", -5, 0
+        ),  # A log uniform from ~0.007 to 1 might be sensible
+        "min_child_weight": hp.quniform(
+            "min_child_weight", 1, 10, 1
+        ),  # You can adjust the range based on dataset size
+        "max_depth": hp.choice(
+            "max_depth", list(range(3, 15))
+        ),  # Common choice for depth
         "gamma": hp.quniform("gamma", 0, 0.5, 0.01),  # A range of 0 to 0.5 by 0.01
-        "subsample": hp.quniform("subsample", 0.5, 1, 0.05),  # Values from 0.5 to 1 with a step of 0.05
-        "colsample_bytree": hp.quniform("colsample_bytree", 0.5, 1, 0.05),  # Similar to above
+        "subsample": hp.quniform(
+            "subsample", 0.5, 1, 0.05
+        ),  # Values from 0.5 to 1 with a step of 0.05
+        "colsample_bytree": hp.quniform(
+            "colsample_bytree", 0.5, 1, 0.05
+        ),  # Similar to above
         "colsample_bylevel": hp.quniform("colsample_bylevel", 0.5, 1, 0.05),
         "colsample_bynode": hp.quniform("colsample_bynode", 0.5, 1, 0.05),
-        "reg_lambda": hp.loguniform("reg_lambda", -5, 2),  # Log uniform for regularization
+        "reg_lambda": hp.loguniform(
+            "reg_lambda", -5, 2
+        ),  # Log uniform for regularization
         "reg_alpha": hp.loguniform("reg_alpha", -5, 2),
         "scale_pos_weight": hp.loguniform(
             "scale_pos_weight", 0, 2
@@ -83,7 +97,13 @@ def tune_xgb_parameters(X, y, max_evals=200):  # Increased max_evals
     }
 
     trials = Trials()
-    best_params = fmin(fn=xgb_objective, space=space, algo=tpe.suggest, max_evals=max_evals, trials=trials)
+    best_params = fmin(
+        fn=xgb_objective,
+        space=space,
+        algo=tpe.suggest,
+        max_evals=max_evals,
+        trials=trials,
+    )
 
     # Map back the integer values for certain parameters
     best_params["min_child_weight"] = int(best_params["min_child_weight"])
@@ -127,12 +147,24 @@ def tune_rf_parameters(X, y, max_evals=100):
     }
 
     trials = Trials()
-    best_params = fmin(fn=rf_objective, space=space, algo=tpe.suggest, max_evals=max_evals, trials=trials)
+    best_params = fmin(
+        fn=rf_objective,
+        space=space,
+        algo=tpe.suggest,
+        max_evals=max_evals,
+        trials=trials,
+    )
 
-    best_params["n_estimators"] = [i for i in range(50, 500, 50)][best_params["n_estimators"]]
+    best_params["n_estimators"] = [i for i in range(50, 500, 50)][
+        best_params["n_estimators"]
+    ]
     best_params["max_depth"] = list(range(3, 15))[best_params["max_depth"]]
-    best_params["min_samples_split"] = list(range(2, 20))[best_params["min_samples_split"]]
-    best_params["min_samples_leaf"] = list(range(1, 10))[best_params["min_samples_leaf"]]
+    best_params["min_samples_split"] = list(range(2, 20))[
+        best_params["min_samples_split"]
+    ]
+    best_params["min_samples_leaf"] = list(range(1, 10))[
+        best_params["min_samples_leaf"]
+    ]
     best_params["max_features"] = ["auto", "sqrt", "log2"][best_params["max_features"]]
     save_hyperparameters("rf", best_params)
     return best_params
@@ -140,42 +172,42 @@ def tune_rf_parameters(X, y, max_evals=100):
 
 def lgbm_objective(space, X, y):
     model = lgb.LGBMClassifier(
-        n_estimators=int(space["n_estimators"]),
-        learning_rate=space["learning_rate"],
-        max_depth=int(space["max_depth"]),
-        num_leaves=int(space["num_leaves"]),
-        min_child_samples=int(space["min_child_samples"]),
-        subsample=space["subsample"],
-        bagging_freq=int(space["bagging_freq"]),
         colsample_bytree=space["colsample_bytree"],
+        learning_rate=space["learning_rate"],
+        max_bin=int(space["max_bin"]),
+        max_depth=int(space["max_depth"]),
+        min_child_samples=int(space["min_child_samples"]),
+        min_child_weight=space["min_child_weight"],
+        min_split_gain=space["min_split_gain"],
+        n_estimators=int(space["n_estimators"]),
+        num_leaves=int(space["num_leaves"]),
         reg_alpha=space["reg_alpha"],
         reg_lambda=space["reg_lambda"],
-        min_split_gain=space["min_split_gain"],
-        min_child_weight=space["min_child_weight"],
+        subsample=space["subsample"],
         subsample_freq=int(space["subsample_freq"]),
-        max_bin=int(space["max_bin"]),
         verbose=-1,
     )
     accuracy = cross_val_score(model, X, y, cv=10, n_jobs=-1).mean()
     return {"loss": -accuracy, "status": STATUS_OK}
 
 
-def tune_lgbm_parameters(X, y, max_evals=600):
+def tune_lgbm_parameters(X, y, max_evals=750):
     space = {
-        "n_estimators": hp.choice("n_estimators", range(800, 1100, 10)),
-        "learning_rate": hp.loguniform("learning_rate", np.log(0.005), np.log(0.02)),
-        "max_depth": hp.choice("max_depth", range(5, 25)),
-        "num_leaves": hp.choice("num_leaves", range(30, 150)),
-        "min_child_samples": hp.choice("min_child_samples", range(20, 100)),
+        "colsample_bytree": hp.uniform("colsample_bytree", 0.5, 0.9),
+        "learning_rate": hp.loguniform("learning_rate", np.log(0.001), np.log(0.05)),
+        "max_bin": hp.quniform("max_bin", 180, 300, 1),
+        "max_depth": hp.quniform("max_depth", 10, 30, 1),
+        "min_child_samples": hp.quniform("min_child_samples", 5, 50, 1),
+        "min_child_weight": hp.loguniform(
+            "min_child_weight", np.log(0.0001), np.log(0.01)
+        ),
+        "min_split_gain": hp.loguniform("min_split_gain", np.log(0.0001), np.log(0.01)),
+        "n_estimators": hp.quniform("n_estimators", 800, 1500, 1),
+        "num_leaves": hp.quniform("num_leaves", 80, 200, 1),
+        "reg_alpha": hp.loguniform("reg_alpha", np.log(0.00001), np.log(0.01)),
+        "reg_lambda": hp.loguniform("reg_lambda", np.log(0.001), np.log(0.05)),
         "subsample": hp.uniform("subsample", 0.5, 0.9),
-        "bagging_freq": hp.choice("bagging_freq", list(range(0, 10))),
-        "colsample_bytree": hp.uniform("colsample_bytree", 0.5, 0.8),
-        "reg_alpha": hp.choice("reg_alpha", [0] + [np.exp(x) for x in np.linspace(np.log(0.00001), np.log(1), 100)]),
-        "reg_lambda": hp.choice("reg_lambda", [0] + [np.exp(x) for x in np.linspace(np.log(0.00001), np.log(1), 100)]),
-        "min_split_gain": hp.loguniform("min_split_gain", np.log(0.0001), np.log(0.1)),
-        "min_child_weight": hp.loguniform("min_child_weight", np.log(0.001), np.log(0.1)),
-        "subsample_freq": hp.choice("subsample_freq", range(0, 10)),
-        "max_bin": hp.quniform("max_bin", 200, 300, 5),
+        "subsample_freq": hp.quniform("subsample_freq", 0, 7, 1),
     }
     trials = Trials()
     objective = partial(lgbm_objective, X=X, y=y)
@@ -183,21 +215,28 @@ def tune_lgbm_parameters(X, y, max_evals=600):
         fn=objective,
         space=space,
         algo=rand.suggest,
-        rstate=np.random.default_rng(2384719),
-        max_evals=125,
+        rstate=np.random.default_rng(3920),
+        max_evals=150,
         trials=trials,
     )
     fmin(
         fn=objective,
         space=space,
         algo=tpe.suggest,
-        rstate=np.random.default_rng(42631),
+        rstate=np.random.default_rng(964231),
         max_evals=max_evals,
         trials=trials,
     )
 
     best_params = space_eval(space, trials.argmin)
 
+    # Now cast the necessary parameters to integers
+    best_params["max_bin"] = int(best_params["max_bin"])
+    best_params["max_depth"] = int(best_params["max_depth"])
+    best_params["min_child_samples"] = int(best_params["min_child_samples"])
+    best_params["n_estimators"] = int(best_params["n_estimators"])
+    best_params["num_leaves"] = int(best_params["num_leaves"])
+    best_params["subsample_freq"] = int(best_params["subsample_freq"])
     save_hyperparameters("lgbm", best_params)
     return best_params
 
@@ -222,12 +261,21 @@ def nn_objective(space, X_train, y_train, X_val, y_val, X_test, y_test, device):
     # Create DataLoader Objects
     train_dataset = TensorDataset(X_train, y_train)
     train_loader = DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=10, persistent_workers=True
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        pin_memory=True,
+        num_workers=10,
+        persistent_workers=True,
     )
 
     val_dataset = TensorDataset(X_val, y_val)
     val_loader = DataLoader(
-        val_dataset, batch_size=batch_size, pin_memory=True, num_workers=10, persistent_workers=True
+        val_dataset,
+        batch_size=batch_size,
+        pin_memory=True,
+        num_workers=10,
+        persistent_workers=True,
     )
 
     input_dim = 79
@@ -277,7 +325,9 @@ def nn_objective(space, X_train, y_train, X_val, y_val, X_test, y_test, device):
         val_loss = 0.0
         with torch.no_grad():
             for batch_data, batch_labels in val_loader:
-                batch_data, batch_labels = batch_data.to(device), batch_labels.to(device)
+                batch_data, batch_labels = batch_data.to(device), batch_labels.to(
+                    device
+                )
 
                 outputs = model(batch_data)
                 loss = criterion(outputs, batch_labels)
@@ -319,7 +369,10 @@ def tune_nn_parameters(X, y, X_val, y_val, X_test, y_test, device):
     space = {
         "batch_size": hp.choice("batch_size", [64, 128, 256]),
         "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-1)),
-        "dropout": hp.choice("dropout", [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6]),
+        "dropout": hp.choice(
+            "dropout",
+            [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6],
+        ),
         "layers": hp.choice(
             "layers",
             [
@@ -357,7 +410,9 @@ def tune_nn_parameters(X, y, X_val, y_val, X_test, y_test, device):
         "factor": hp.uniform("factor", 0.05, 0.6),
         "patience": hp.choice("patience", [3, 5, 7, 10, 12]),
         # Activation Function Selection
-        "activation": hp.choice("activation", ["relu", "leaky_relu", "elu", "swish", "sigmoid", "tanh"]),
+        "activation": hp.choice(
+            "activation", ["relu", "leaky_relu", "elu", "swish", "sigmoid", "tanh"]
+        ),
         # Batch Normalization Selection
         "use_batch_norm": hp.choice("use_batch_norm", [False, True]),
         # Optimizer Selection and Related Parameter Selection
@@ -366,35 +421,55 @@ def tune_nn_parameters(X, y, X_val, y_val, X_test, y_test, device):
             [
                 {
                     "type": "adam",
-                    "beta1": hp.uniform("adam_beta1", 0.85, 0.999),  # Typically close to 1
-                    "beta2": hp.uniform("adam_beta2", 0.9, 0.9999),  # Typically close to 1
+                    "beta1": hp.uniform(
+                        "adam_beta1", 0.85, 0.999
+                    ),  # Typically close to 1
+                    "beta2": hp.uniform(
+                        "adam_beta2", 0.9, 0.9999
+                    ),  # Typically close to 1
                     "eps": hp.loguniform(
                         "adam_eps", -10, -6
                     ),  # A very small number to prevent any division by zero in the implementation
                 },
                 {
                     "type": "rmsprop",
-                    "alpha": hp.uniform("rmsprop_alpha", 0.9, 0.9999),  # Moving average of squared gradient
-                    "eps": hp.loguniform("rmsprop_eps", -10, -6),  # A small stabilizing term
+                    "alpha": hp.uniform(
+                        "rmsprop_alpha", 0.9, 0.9999
+                    ),  # Moving average of squared gradient
+                    "eps": hp.loguniform(
+                        "rmsprop_eps", -10, -6
+                    ),  # A small stabilizing term
                 },
                 {
                     "type": "sgd",
                     "momentum": hp.uniform("sgd_momentum", 0.5, 0.99),  # Momentum term
-                    "nesterov": hp.choice("sgd_nesterov", [True, False]),  # Whether to use Nesterov acceleration
+                    "nesterov": hp.choice(
+                        "sgd_nesterov", [True, False]
+                    ),  # Whether to use Nesterov acceleration
                 },
                 {
                     "type": "nadam",
-                    "beta1": hp.uniform("nadam_beta1", 0.85, 0.999),  # Typically close to 1
-                    "beta2": hp.uniform("nadam_beta2", 0.9, 0.9999),  # Typically close to 1
+                    "beta1": hp.uniform(
+                        "nadam_beta1", 0.85, 0.999
+                    ),  # Typically close to 1
+                    "beta2": hp.uniform(
+                        "nadam_beta2", 0.9, 0.9999
+                    ),  # Typically close to 1
                     "eps": hp.loguniform(
                         "nadam_eps", -10, -6
                     ),  # A very small number to prevent any division by zero in the implementation
                 },
                 {
                     "type": "radam",
-                    "beta1": hp.uniform("radam_beta1", 0.85, 0.999),  # Typically close to 1
-                    "beta2": hp.uniform("radam_beta2", 0.9, 0.9999),  # Typically close to 1
-                    "eps": hp.loguniform("radam_eps", -10, -6),  # A very small number to prevent any division by zero
+                    "beta1": hp.uniform(
+                        "radam_beta1", 0.85, 0.999
+                    ),  # Typically close to 1
+                    "beta2": hp.uniform(
+                        "radam_beta2", 0.9, 0.9999
+                    ),  # Typically close to 1
+                    "eps": hp.loguniform(
+                        "radam_eps", -10, -6
+                    ),  # A very small number to prevent any division by zero
                 },
             ],
         ),
@@ -413,7 +488,14 @@ def tune_nn_parameters(X, y, X_val, y_val, X_test, y_test, device):
         trials = Trials()
 
     objective = partial(
-        nn_objective, X_train=X, y_train=y, X_val=X_val, y_val=y_val, X_test=X_test, y_test=y_test, device=device
+        nn_objective,
+        X_train=X,
+        y_train=y,
+        X_val=X_val,
+        y_val=y_val,
+        X_test=X_test,
+        y_test=y_test,
+        device=device,
     )
     fmin(
         fn=objective,
@@ -445,7 +527,10 @@ def get_optimizer(params, optimization_config):
         return torch.optim.Adam(
             params,
             lr=learning_rate,
-            betas=(optimization_config["optimizer"]["beta1"], optimization_config["optimizer"]["beta2"]),
+            betas=(
+                optimization_config["optimizer"]["beta1"],
+                optimization_config["optimizer"]["beta2"],
+            ),
             eps=optimization_config["optimizer"]["eps"],
             weight_decay=weight_decay,
         )
@@ -472,7 +557,10 @@ def get_optimizer(params, optimization_config):
         return torch.optim.NAdam(
             params,
             lr=learning_rate,
-            betas=(optimization_config["optimizer"]["beta1"], optimization_config["optimizer"]["beta2"]),
+            betas=(
+                optimization_config["optimizer"]["beta1"],
+                optimization_config["optimizer"]["beta2"],
+            ),
             eps=optimization_config["optimizer"]["eps"],
             weight_decay=weight_decay,
         )
@@ -481,7 +569,10 @@ def get_optimizer(params, optimization_config):
         return torch.optim.RAdam(
             params,
             lr=learning_rate,
-            betas=(optimization_config["optimizer"]["beta1"], optimization_config["optimizer"]["beta2"]),
+            betas=(
+                optimization_config["optimizer"]["beta1"],
+                optimization_config["optimizer"]["beta2"],
+            ),
             eps=optimization_config["optimizer"]["eps"],
             weight_decay=weight_decay,
         )

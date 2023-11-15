@@ -106,7 +106,7 @@ if __name__ == "__main__":
     )
     importance_df.to_csv("./output/feature-importance.txt", index=False, sep="\t")
 
-    ### OPTIMAL THRESHOLD
+    # OPTIMAL THRESHOLD
     # Find the optimal threshold using bayesian optimization
     # optimal_threshold = find_optimal_threshold(train_x, train_y, model)
     # # Or Set Optimal_threshold

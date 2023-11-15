@@ -1,0 +1,15 @@
+{
+    "colsample_bytree": 0.7464725237341857,
+    "learning_rate": 0.006903484592955565,
+    "max_bin": 188,
+    "max_depth": 25,
+    "min_child_samples": 7,
+    "min_child_weight": 0.004466631229620807,
+    "min_split_gain": 0.00032608580006962106,
+    "n_estimators": 1431,
+    "num_leaves": 106,
+    "reg_alpha": 0.002551532589089369,
+    "reg_lambda": 0.0024641902013305145,
+    "subsample": 0.5344659161501666,
+    "subsample_freq": 0
+}

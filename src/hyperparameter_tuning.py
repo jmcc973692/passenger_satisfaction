@@ -14,7 +14,7 @@ import torch.optim
 import xgboost as xgb
 from hyperopt import STATUS_OK, Trials, fmin, hp, rand, space_eval, tpe
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import KFold, RepeatedKFold, StratifiedKFold, cross_val_score
 from torch.utils.data import DataLoader, TensorDataset
 
 from src.DynamicTabularNN import DynamicTabularNN
@@ -167,27 +167,45 @@ def lgbm_objective(space, X, y):
         subsample_freq=int(space["subsample_freq"]),
         verbose=-1,
     )
-    accuracy = cross_val_score(model, X, y, cv=10, n_jobs=-1).mean()
+    # Use KFold with a fixed seed
+    rkf = RepeatedKFold(n_splits=5, n_repeats=3, random_state=42)
+
+    accuracy = cross_val_score(model, X, y, cv=rkf, n_jobs=-1).mean()
+    # Save the results to a file after each trial
+    save_results_to_file(space, accuracy, "./output/trials_results.txt")
+
     return {"loss": -accuracy, "status": STATUS_OK}
 
 
-def tune_lgbm_parameters(X, y, max_evals=750):
+def tune_lgbm_parameters(X, y, max_evals=1000):
     space = {
-        "colsample_bytree": hp.uniform("colsample_bytree", 0.5, 0.9),
+        "colsample_bytree": hp.uniform("colsample_bytree", 0.5, 1.0),
         "learning_rate": hp.loguniform("learning_rate", np.log(0.001), np.log(0.05)),
         "max_bin": hp.quniform("max_bin", 180, 300, 1),
-        "max_depth": hp.quniform("max_depth", 10, 30, 1),
+        "max_depth": hp.quniform("max_depth", 5, 25, 1),
         "min_child_samples": hp.quniform("min_child_samples", 5, 50, 1),
         "min_child_weight": hp.loguniform("min_child_weight", np.log(0.0001), np.log(0.01)),
         "min_split_gain": hp.loguniform("min_split_gain", np.log(0.0001), np.log(0.01)),
-        "n_estimators": hp.quniform("n_estimators", 800, 1500, 1),
+        "n_estimators": hp.quniform("n_estimators", 500, 1500, 1),
         "num_leaves": hp.quniform("num_leaves", 80, 200, 1),
-        "reg_alpha": hp.loguniform("reg_alpha", np.log(0.00001), np.log(0.01)),
-        "reg_lambda": hp.loguniform("reg_lambda", np.log(0.001), np.log(0.05)),
+        "reg_alpha": hp.loguniform("reg_alpha_log", np.log(0.00001), np.log(0.01)),
+        "reg_lambda": hp.loguniform("reg_lambda_log", np.log(0.001), np.log(0.05)),
         "subsample": hp.uniform("subsample", 0.5, 0.9),
         "subsample_freq": hp.quniform("subsample_freq", 0, 7, 1),
     }
-    trials = Trials()
+
+    # Ensure the trials directory exists
+    if not os.path.exists("./trials"):
+        os.makedirs("./trials")
+
+    trials_save_file = "./trials/lgbm_trials.pkl"
+    # If the file exists, set trials to None so that fmin uses the trials_save_file
+    if os.path.exists(trials_save_file):
+        trials = None
+        print("Saved Trials Object Exists! Picking Up Where we Left Off!")
+    else:
+        trials = Trials()
+
     objective = partial(lgbm_objective, X=X, y=y)
     fmin(
         fn=objective,
@@ -196,6 +214,7 @@ def tune_lgbm_parameters(X, y, max_evals=750):
         rstate=np.random.default_rng(3920),
         max_evals=150,
         trials=trials,
+        trials_save_file=trials_save_file,
     )
     fmin(
         fn=objective,
@@ -204,7 +223,12 @@ def tune_lgbm_parameters(X, y, max_evals=750):
         rstate=np.random.default_rng(964231),
         max_evals=max_evals,
         trials=trials,
+        trials_save_file=trials_save_file,
     )
+
+    with open(trials_save_file, "rb") as f:
+        trials = pickle.load(f)
+        print("Loading Trials Object from the Final Saved File!")
 
     best_params = space_eval(space, trials.argmin)
 

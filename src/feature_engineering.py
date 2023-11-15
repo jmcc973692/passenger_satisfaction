@@ -62,9 +62,7 @@ def bin_features(df):
     age_bins = [0, 18, 35, 60, 100]
     distance_bins = [0, 500, 1500, 5000]
     delay_difference_bins = [-np.inf, -5, 5, np.inf]
-    df["Age_bins"] = pd.cut(
-        df["Age"], bins=age_bins, labels=["Child", "Young_Adult", "Adult", "Senior"]
-    )
+    df["Age_bins"] = pd.cut(df["Age"], bins=age_bins, labels=["Child", "Young_Adult", "Adult", "Senior"])
     df["Flight_Distance_bins"] = pd.cut(
         df["Flight_Distance"],
         bins=distance_bins,
@@ -90,9 +88,9 @@ def create_multiplicative_interaction_feature(df, feature1, feature2):
 
 
 def create_overall_delay_indicator(df):
-    df["Experienced_Delay"] = (
-        (df["Arrival_Delay_in_Minutes"] > 0) | (df["Departure_Delay_in_Minutes"] > 0)
-    ).astype(int)
+    df["Experienced_Delay"] = ((df["Arrival_Delay_in_Minutes"] > 0) | (df["Departure_Delay_in_Minutes"] > 0)).astype(
+        int
+    )
     return df
 
 
@@ -207,9 +205,7 @@ def feedback_consistency_check_feature(df):
     """
 
     # Create difference features
-    df["diff_inflight_onboard_service"] = (
-        df["Inflight_Service"] - df["On-Board_Service"]
-    )
+    df["diff_inflight_onboard_service"] = df["Inflight_Service"] - df["On-Board_Service"]
     df["diff_seatcomfort_legroom"] = df["Seat_Comfort"] - df["Leg_Room"]
     df["diff_wifi_onlineboarding"] = df["Inflight_Wifi_Service"] - df["Online_Boarding"]
     df["diff_food_cleanliness"] = df["Food_and_Drink"] - df["Cleanliness"]
@@ -225,12 +221,8 @@ def check_for_nans(df, stage):
 def perform_feature_engineering(df):
     # Add delay indicator features
     df = create_overall_delay_indicator(df)
-    df["Total_Delay_Minutes"] = (
-        df["Departure_Delay_in_Minutes"] + df["Arrival_Delay_in_Minutes"]
-    )
-    df["Flight_Delay_Difference_Minutes"] = (
-        df["Arrival_Delay_in_Minutes"] - df["Departure_Delay_in_Minutes"]
-    )
+    df["Total_Delay_Minutes"] = df["Departure_Delay_in_Minutes"] + df["Arrival_Delay_in_Minutes"]
+    df["Flight_Delay_Difference_Minutes"] = df["Arrival_Delay_in_Minutes"] - df["Departure_Delay_in_Minutes"]
 
     # Bin Features
     df = bin_features(df)
@@ -279,37 +271,19 @@ def perform_feature_engineering(df):
     # check_for_nans(df, "After One Hot Encoding")
 
     # Categorical Multiplicative Interaction Features
-    df = create_multiplicative_interaction_feature(
-        df, "Online_Boarding", "Ease_of_Online_booking"
-    )
+    df = create_multiplicative_interaction_feature(df, "Online_Boarding", "Ease_of_Online_booking")
     df = create_multiplicative_interaction_feature(df, "Seat_Comfort", "Leg_Room")
-    df = create_multiplicative_interaction_feature(
-        df, "Inflight_Entertainment", "Flight_Distance"
-    )
-    df = create_multiplicative_interaction_feature(
-        df, "Food_and_Drink", "Flight_Distance"
-    )
+    df = create_multiplicative_interaction_feature(df, "Inflight_Entertainment", "Flight_Distance")
+    df = create_multiplicative_interaction_feature(df, "Food_and_Drink", "Flight_Distance")
     df = create_multiplicative_interaction_feature(df, "Age", "Type_of_Travel_Personal")
-    df = create_multiplicative_interaction_feature(
-        df, "Gender_Male", "Inflight_Wifi_Service"
-    )
-    df = create_multiplicative_interaction_feature(
-        df, "Departure_Delay_in_Minutes", "Arrival_Delay_in_Minutes"
-    )
+    df = create_multiplicative_interaction_feature(df, "Gender_Male", "Inflight_Wifi_Service")
+    df = create_multiplicative_interaction_feature(df, "Departure_Delay_in_Minutes", "Arrival_Delay_in_Minutes")
     df = create_multiplicative_interaction_feature(df, "Age", "Inflight_Entertainment")
     df = create_multiplicative_interaction_feature(df, "Class_Economy", "Cleanliness")
-    df = create_multiplicative_interaction_feature(
-        df, "Class_Economy_Plus", "Cleanliness"
-    )
-    df = create_multiplicative_interaction_feature(
-        df, "Customer_Type_Non-Loyal_Customer", "On-Board_Service"
-    )
-    df = create_multiplicative_interaction_feature(
-        df, "Class_Economy", "Flight_Distance"
-    )
-    df = create_multiplicative_interaction_feature(
-        df, "Class_Economy_Plus", "Flight_Distance"
-    )
+    df = create_multiplicative_interaction_feature(df, "Class_Economy_Plus", "Cleanliness")
+    df = create_multiplicative_interaction_feature(df, "Customer_Type_Non-Loyal_Customer", "On-Board_Service")
+    df = create_multiplicative_interaction_feature(df, "Class_Economy", "Flight_Distance")
+    df = create_multiplicative_interaction_feature(df, "Class_Economy_Plus", "Flight_Distance")
     # check_for_nans(df, "After Interaction Features")
 
     # Aggregate Features
@@ -325,7 +299,7 @@ def perform_feature_engineering(df):
 
 def perform_feature_engineering_lgbm(df):
     # Separate the Data into Data Types
-    # numerical_columns = ["Age", "Flight_Distance", "Departure_Delay_in_Minutes", "Arrival_Delay_in_Minutes"]
+    # numerical_columns = ["Age", "Age^2", "Flight_Distance", "Departure_Delay_in_Minutes", "Arrival_Delay_in_Minutes"]
     categorical_columns = ["Gender", "Customer_Type", "Type_of_Travel", "Class"]
 
     df = polynomial_features(df, ["Age"])

@@ -2,7 +2,7 @@ from functools import partial, update_wrapper
 
 from hyperopt import STATUS_OK, Trials, fmin, hp, tpe
 from sklearn.metrics import accuracy_score, make_scorer
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import KFold, RepeatedKFold, StratifiedKFold, cross_val_score
 
 
 def custom_accuracy_score(y_true, y_pred_probs, threshold):
@@ -24,19 +24,21 @@ def threshold_objective(threshold, X, y, model):
     # Get the custom scorer with the current threshold
     scorer = threshold_scorer(threshold)
 
-    # Calculate cross-validation score using the scorer
-    scores = cross_val_score(model, X, y, cv=10, scoring=scorer, n_jobs=-1)
+    # Calculate cross-validation
+    # score using the scorer
+    rkf = RepeatedKFold(n_splits=5, n_repeats=3, random_state=42)
+    scores = cross_val_score(model, X, y, cv=rkf, scoring=scorer, n_jobs=-1)
 
     mean_cv_score = scores.mean()
     return {"loss": -mean_cv_score, "status": STATUS_OK}
 
 
 def find_optimal_threshold(X, y, model):
-    space = hp.uniform("threshold", 0.3, 0.7)
+    space = hp.normal("threshold", mu=0.5, sigma=0.1)
 
     trials = Trials()
     objective = partial(threshold_objective, X=X, y=y, model=model)
-    optimal_threshold = fmin(fn=objective, space=space, algo=tpe.suggest, max_evals=100, trials=trials)
+    optimal_threshold = fmin(fn=objective, space=space, algo=tpe.suggest, max_evals=50, trials=trials)
 
     print(f"Optimal Threshold = {optimal_threshold['threshold']}")
     return optimal_threshold["threshold"]
